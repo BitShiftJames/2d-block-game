@@ -21,12 +21,14 @@ int main() {
   SetConfigFlags( FLAG_WINDOW_TOPMOST | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT);
   InitWindow(ScreenWidth, ScreenHeight, "Restarting from scratch");
   SetTargetFPS(60);
-
-  Image bubbleTest = LoadImage("../assets/bubbles.png");
-  Texture2D bubbleTexture = LoadTextureFromImage(bubbleTest);
-  UnloadImage(bubbleTest);
-
-  // passing in 0 tells raylib to load default. 
+  
+//  Image bubbleTest = LoadImage("../assets/bubbles.png");
+//  Texture2D bubbleTexture = LoadTextureFromImage(bubbleTest);
+//  UnloadImage(bubbleTest);
+  Image ImgtileSheet = LoadImage("../assets/tilesheet.png");
+  Texture2D TextileSheet = LoadTextureFromImage(ImgtileSheet);
+  UnloadImage(ImgtileSheet);
+// passing in 0 tells raylib to load default. 
   Shader testShader = LoadShader(0, "../shaders/lighting.frag");
 
   world global_world = {0};
@@ -41,9 +43,9 @@ int main() {
       tile CurrentTile = global_world.map[tileY * global_world.Width + tileX];
       if (tileY > global_world.TileHeight / 2) {
         if (tileX % 2 == 1) {
-          CurrentTile.type = 1;
+          CurrentTile.type = 43;
         } else {
-          CurrentTile.type = 2;
+          CurrentTile.type = 41;
         }
       }
 
@@ -55,21 +57,25 @@ int main() {
 
     BeginDrawing();
 
-      ClearBackground(GRAY);
+      ClearBackground(BLACK);
 
       for (i32 tileY = 0; tileY < global_world.Height; tileY++) {
         for (i32 tileX = 0; tileX < global_world.Width; tileX++) {
           tile CurrentTile = global_world.map[tileY * global_world.Width + tileX];
-          switch (CurrentTile.type) {
-            case 1: {
-              DrawRectangle(tileX * global_world.TileWidth, tileY * global_world.TileHeight, 
-                          global_world.TileWidth, global_world.TileHeight, RED);
-            } break;
-            case 2: {
-              DrawRectangle(tileX * global_world.TileWidth, tileY * global_world.TileHeight, 
-                          global_world.TileWidth, global_world.TileHeight, BLUE);
-            }
+          // the tiletype of zero in logic is no tile but the tile sheet of 0 is tile 1 so 
+          // subtracting one fixes that bias
+          i32 ActualTileType = CurrentTile.type - 1;
+          if (ActualTileType < 0) {
+            continue;
           }
+          f32 spacing = (global_world.TileWidth * 3);
+          f32 offset = global_world.TileWidth;
+          u32 max_x_tile_sheet = (TextileSheet.width - offset) / spacing;
+          f32 typeX =  (ActualTileType % max_x_tile_sheet) * spacing + offset;
+          f32 typeY =  ((f32)ActualTileType / max_x_tile_sheet) * spacing + offset;
+          DrawTextureRec(TextileSheet, 
+                         Rectangle{typeX, typeY, (f32)global_world.TileWidth, (f32)global_world.TileHeight}, 
+                         Vector2{(f32)(tileX * global_world.TileWidth), (f32)(tileY * global_world.TileHeight)}, WHITE);
         }
       }
 

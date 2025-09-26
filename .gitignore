@@ -1,2 +1,6 @@
 src/build.bat
 src/main.exe
+src/main.ilk
+src/main.pdb
+src/vc140.pdb
+src/main.obj
