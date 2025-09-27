@@ -3,4 +3,6 @@ src/main.exe
 src/main.ilk
 src/main.pdb
 src/vc140.pdb
+src/main.sln
 src/main.obj
+src/.vs/

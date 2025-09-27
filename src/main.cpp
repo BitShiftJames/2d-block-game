@@ -1,10 +1,13 @@
 #include "raylib.h"
 #include "jamTypes.h"
+#include "jamMath.h"
+
 struct tile {
   u32 type;
   // shader information
   u32 light;
 };
+
 struct world {
   // maximum world size is 65,535
   u16 Width;
@@ -18,7 +21,7 @@ int main() {
   i32 ScreenWidth = 800;
   i32 ScreenHeight = 400;
 
-  SetConfigFlags( FLAG_WINDOW_TOPMOST | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT);
+  SetConfigFlags(FLAG_WINDOW_TOPMOST | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT);
   InitWindow(ScreenWidth, ScreenHeight, "Restarting from scratch");
   SetTargetFPS(60);
   
@@ -43,9 +46,9 @@ int main() {
       tile CurrentTile = global_world.map[tileY * global_world.Width + tileX];
       if (tileY > global_world.TileHeight / 2) {
         if (tileX % 2 == 1) {
-          CurrentTile.type = 43;
+          CurrentTile.type = 42;
         } else {
-          CurrentTile.type = 41;
+          CurrentTile.type = 43;
         }
       }
 
@@ -71,8 +74,8 @@ int main() {
           f32 spacing = (global_world.TileWidth * 3);
           f32 offset = global_world.TileWidth;
           u32 max_x_tile_sheet = (TextileSheet.width - offset) / spacing;
-          f32 typeX =  (ActualTileType % max_x_tile_sheet) * spacing + offset;
-          f32 typeY =  ((f32)ActualTileType / max_x_tile_sheet) * spacing + offset;
+          f32 typeX =  (ActualTileType % (max_x_tile_sheet)) * spacing + offset;
+          f32 typeY =  (floor_f32((f32)ActualTileType / max_x_tile_sheet)) * spacing + offset;
           DrawTextureRec(TextileSheet, 
                          Rectangle{typeX, typeY, (f32)global_world.TileWidth, (f32)global_world.TileHeight}, 
                          Vector2{(f32)(tileX * global_world.TileWidth), (f32)(tileY * global_world.TileHeight)}, WHITE);
