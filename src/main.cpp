@@ -93,9 +93,10 @@ int main() {
   follow_camera.target = {player.x, player.y};
   follow_camera.zoom = 1.0f;
   follow_camera.offset = {(f32)ScreenWidth / 2, (f32)ScreenHeight / 2};
-  Ray rayw;
+//f32 OneSecond = 0;
   while (!WindowShouldClose()) {
     f32 deltaTime = GetFrameTime();
+ //   OneSecond += deltaTime;
 
     v2 ddPos = {};
     if (IsKeyDown(KEY_W)) {
@@ -163,7 +164,7 @@ int main() {
         DrawRectangleRec(test_collision_rect, Rectangle_color);
         DrawRectangleRec(player, BLUE);
       EndMode2D();
-      DrawText(TextFormat("Left: %02.02f, Right: %02.02f\nTop: %02.02f, Bottom: %02.02f", Overlap.x, Overlap.width, Overlap.y, Overlap.height), 20, 20, 20, WHITE);
+      DrawText(TextFormat("OneSecond: %f", OneSecond), 20, 20, 20, WHITE);
 // shader work later
 //      BeginShaderMode(testShader);
 //        DrawTexture(bubbleTexture, 
@@ -172,6 +173,10 @@ int main() {
 //      EndShaderMode();
 
     EndDrawing();
+
+//    if (OneSecond >= 1.0f) {
+//      OneSecond = 0;
+//    }
 
   }
   CloseWindow();
