@@ -1,3 +1,5 @@
+#ifndef JAMTYPES_H
+#define JAMTYPES_H
 
 #include <stdint.h>
 
@@ -14,3 +16,5 @@ typedef int64_t i64;
 
 typedef float f32;
 typedef double f64;
+
+#endif
