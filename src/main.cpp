@@ -1,8 +1,7 @@
 #include "raylib.h"
 #include "jamTypes.h"
 #include "jamMath.h"
-#include <cmath>
-#include <cstdlib>
+#include <complex>
 
 struct tile {
   u32 type;
@@ -137,6 +136,7 @@ int main() {
     u32 MaxTileY = (floor_f32(Max.y)) / global_world.TileSize;
 
     f32 tMin = 1.0f;
+    v2 normal = {};
     for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
       for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
         // general accessor function incoming.
@@ -165,9 +165,23 @@ int main() {
           }
 
           if (fabsf(Minimum_overlap.x) > fabsf(Minimum_overlap.y)) {
-            tMin = Minimum_overlap.y / delta_movement.y;
+            if (delta_movement.y != 0.0f) {
+              if (Minimum_overlap.y < 0.0f) {
+                normal.y = 1.0f;
+              } else {
+                normal.y = -1.0f;
+              }
+              tMin = Minimum_overlap.y / delta_movement.y;
+            }
           } else {
-            tMin = Minimum_overlap.x / delta_movement.x;
+            if (delta_movement.x != 0.0f) {
+              if (Minimum_overlap.x < 0.0f) {
+                normal.x = -1.0f;
+              } else {
+                normal.x = 1.0f;
+              }
+              tMin = Minimum_overlap.x / delta_movement.x;
+            }
           }
 
           break;
@@ -178,6 +192,15 @@ int main() {
     }
 
     playerPos += delta_movement * (tMin);
+    
+    f32 normalLength = LengthSq(normal);
+    if (normalLength > 0.0f) {
+      Velocity = Velocity - 1*Inner(Velocity, normal) * normal;
+      // this should entirely remove the problem of sticking I was having in the last version.
+      ddPos = ddPos - Inner(ddPos, normal) * normal;
+    } else {
+    }
+
     Velocity += ddPos * deltaTime;
     
     follow_camera.target = {playerPos.x, playerPos.y};
