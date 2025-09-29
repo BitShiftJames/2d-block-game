@@ -44,7 +44,6 @@ u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states Sta
 // this function is probably not needed I am just making it a function so I can debug
 // the render stack.
 void player_acceleration(entity *Entity, f32 inputStrength) {
-    // acceleration clear to 0 moved at the end of each frame. Within the entity loop.
     Entity->acceleration = {0, 0};
     if (IsKeyDown(KEY_W)) {
       Entity->acceleration.y--;

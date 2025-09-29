@@ -27,6 +27,11 @@ struct v2 {
   };
 };
 
+bool operator==(v2 A, v2 B) {
+  return A.x == B.x &&
+         A.y == B.y;
+}
+
 v2 operator+(v2 A, v2 B) {
   v2 Result = {};
 
@@ -191,6 +196,17 @@ jam_rect2 JamRectMinDim(v2 Min, v2 Dim) {
   Result.y = Min.y;
   Result.Max.x = Min.x + Dim.x;
   Result.Max.y = Min.y + Dim.y;
+
+  return Result;
+}
+
+jam_rect2 JamRectMinDim(v2 Min, f32 Dim) {
+  jam_rect2 Result = {};
+
+  Result.x = Min.x;
+  Result.y = Min.y;
+  Result.Max.x = Min.x + Dim;
+  Result.Max.y = Min.y + Dim;
 
   return Result;
 }

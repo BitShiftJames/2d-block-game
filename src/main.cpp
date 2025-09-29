@@ -56,59 +56,68 @@ void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_
     u32 MinTileY = (floor_f32(Min.y)) / global_world.TileSize;
     u32 MaxTileX = (floor_f32(Max.x)) / global_world.TileSize;
     u32 MaxTileY = (floor_f32(Max.y)) / global_world.TileSize;
-    // the bug in here causeing sticking is probably when you pass over a tile sometimes the x overlap is less than the y overlap causing a 'stick'
-    // there is probably a couple solutions but the one that comes to mind first is giving the y overlap priority past a certain amount so like
-    // abs(overlapY) < abs(overlapX) + .0002.
-    // that .0002 would be the epsilon.
+    jam_rect2 TileRect = {};
     for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
       for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
         // general accessor function incoming.
         tile CurrentTile = global_world.map[TileY * global_world.Width + TileX];
-
+        // okay new theory I need to construct an actual rectangle from all the connecting tiles
+        // this assumes a perfect AABB tile collision rect which is 90% of cases but if I want entities to have tile aligned dimensions
+        // it would be best to do a field of rectangles to do AABB collision on. That way I can have even more odd collision behaviors
+        // 0. look at all tiles overlaping the player
+        // 1. Construct a single rectangle out of the tiles (this will make it so entities can not have tile aligned dimensions)
+        // 2. use constructed rectangle to resolve collision
         if (CurrentTile.type != 0) {
+          jam_rect2 current_tile_rectangle = JamRectMinDim(v2{(f32)TileX * global_world.TileSize, (f32)TileY * global_world.TileSize}, global_world.TileSize);
 
-          jam_rect2 TileRect = JamRectMinDim(v2{(f32)(TileX * global_world.TileSize), (f32)(TileY * global_world.TileSize)}, 
-                                             v2{(f32)global_world.TileSize, (f32)global_world.TileSize});
-          // TODO: This could be in a seperate function, maybe.
-          jam_rect2 overlap = rectangle_overlap(player_collision_rect, TileRect);
-          v2 Minimum_overlap = {};
-          
-          if (overlap.Max.x > fabsf(overlap.x)) {
-            Minimum_overlap.x = overlap.x;
+          if (TileRect.Min == TileRect.Max) {
+            TileRect = current_tile_rectangle;
           } else {
-            Minimum_overlap.x = overlap.Max.x;
+            v2 Min = v2{Minimum(TileRect.Min.x, current_tile_rectangle.Min.x), Minimum(TileRect.Min.y, current_tile_rectangle.Min.y)}; 
+            v2 Max = v2{Maximum(TileRect.Max.x, current_tile_rectangle.Max.x), Maximum(TileRect.Max.y, current_tile_rectangle.Max.y)};
+            
+            TileRect = JamRectMinMax(Min, Max);
           }
-
-          if (overlap.Max.y > fabsf(overlap.y)) {
-            Minimum_overlap.y = overlap.y;
-          } else {
-            Minimum_overlap.y = overlap.Max.y;
-          }
-
-          if (fabsf(Minimum_overlap.x) > fabsf(Minimum_overlap.y)) {
-            if (delta_movement.y != 0.0f) {
-              if (Minimum_overlap.y < 0.0f) {
-                normal.y = 1.0f;
-              } else {
-                normal.y = -1.0f;
-              }
-              tMin = Minimum_overlap.y / delta_movement.y;
-            }
-          } else {
-            if (delta_movement.x != 0.0f) {
-              if (Minimum_overlap.x < 0.0f) {
-                normal.x = -1.0f;
-              } else {
-                normal.x = 1.0f;
-              }
-              tMin = Minimum_overlap.x / delta_movement.x;
-            }
-          }
-
-          break;
 
         }
 
+      }
+    }
+
+    if (AABBcollisioncheck(player_collision_rect, TileRect)) {
+      jam_rect2 overlap = rectangle_overlap(player_collision_rect, TileRect);
+      v2 Minimum_overlap = {};
+      
+      if (overlap.Max.x > fabsf(overlap.x)) {
+        Minimum_overlap.x = overlap.x;
+      } else {
+        Minimum_overlap.x = overlap.Max.x;
+      }
+
+      if (overlap.Max.y > fabsf(overlap.y)) {
+        Minimum_overlap.y = overlap.y;
+      } else {
+        Minimum_overlap.y = overlap.Max.y;
+      }
+
+      if ((fabsf(Minimum_overlap.x) > fabsf(Minimum_overlap.y))) {
+        if (delta_movement.y != 0.0f) {
+          if (Minimum_overlap.y < 0.0f) {
+            normal.y = 1.0f;
+          } else {
+            normal.y = -1.0f;
+          }
+          tMin = Minimum_overlap.y / delta_movement.y;
+        }
+      } else {
+        if (delta_movement.x != 0.0f) {
+          if (Minimum_overlap.x < 0.0f) {
+            normal.x = -1.0f;
+          } else {
+            normal.x = 1.0f;
+          }
+          tMin = Minimum_overlap.x / delta_movement.x;
+        }
       }
     }
 
@@ -117,8 +126,6 @@ void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_
     f32 normalLength = LengthSq(normal);
     if (normalLength > 0.0f) {
       Entity->velocity = Entity->velocity - 1*Inner(Entity->velocity, normal) * normal;
-      // this should entirely remove the problem of sticking I was having in the last version.
-      // the problem is back, dumb bass.
       Entity->acceleration = Entity->acceleration - Inner(Entity->acceleration, normal) * normal;
     } else {
     }
@@ -183,7 +190,7 @@ int main() {
   
   total_entities global_entities = {};
 
-  u8 entity_id = add_entity(&global_entities, v2{32, 48}, spawn_location, IGNORE, true);
+  u8 entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
 
   f32 Gravity = 9.8;
 //f32 OneSecond = 0;
