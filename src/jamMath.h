@@ -7,6 +7,7 @@
 
 #define Minimum(a, b) ((a) < (b) ? (a) : (b))
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
+#define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
 
 struct v2 {
   union {

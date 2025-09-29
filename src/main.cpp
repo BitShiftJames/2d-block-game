@@ -1,21 +1,9 @@
 #include "raylib.h"
 #include "jamTypes.h"
 #include "jamMath.h"
+#include "jamEntities.h"
+#include "jamTiles.h"
 
-
-struct tile {
-  u32 type;
-  // shader information
-  u32 light;
-};
-
-struct world {
-  // maximum world size is 65,535
-  u16 Width;
-  u16 Height;
-  u16 TileSize;
-  tile *map;
-};
 
 b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
   b32 left = A.x + A.Max.x < B.x;
@@ -28,13 +16,6 @@ b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
            bottom ||
            top);
 }
-
-struct entity {
-  v2 pos;
-  v2 velocity;
-  v2 acceleration;
-  v2 dim;
-};
 
 jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
   jam_rect2 Result = {};
@@ -55,6 +36,7 @@ v2 generate_delta_movement(entity Entity, f32 deltaTime) {
   return Result;
 }
 
+
 void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_movement, f32 deltaTime) {
 
     v2 new_entity_position = Entity->pos + delta_movement;
@@ -74,6 +56,10 @@ void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_
     u32 MinTileY = (floor_f32(Min.y)) / global_world.TileSize;
     u32 MaxTileX = (floor_f32(Max.x)) / global_world.TileSize;
     u32 MaxTileY = (floor_f32(Max.y)) / global_world.TileSize;
+    // the bug in here causeing sticking is probably when you pass over a tile sometimes the x overlap is less than the y overlap causing a 'stick'
+    // there is probably a couple solutions but the one that comes to mind first is giving the y overlap priority past a certain amount so like
+    // abs(overlapY) < abs(overlapX) + .0002.
+    // that .0002 would be the epsilon.
     for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
       for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
         // general accessor function incoming.
@@ -186,17 +172,18 @@ int main() {
       global_world.map[tileY * global_world.Width + tileX] = CurrentTile;
     }
   }
-  entity player_entity = {};
-  player_entity.dim.x = 32;
-  player_entity.dim.y = 48;
-  player_entity.pos = spawn_location;
 
   f32 inputStrength = 250.0f;
 
+
   Camera2D follow_camera = {};
-  follow_camera.target = {player_entity.pos.x, player_entity.pos.y};
+  follow_camera.target = {spawn_location.x, spawn_location.y};
   follow_camera.zoom = 1.0f;
   follow_camera.offset = {(f32)ScreenWidth / 2, (f32)ScreenHeight / 2};
+  
+  total_entities global_entities = {};
+
+  u8 entity_id = add_entity(&global_entities, v2{32, 48}, spawn_location, IGNORE, true);
 
   f32 Gravity = 9.8;
 //f32 OneSecond = 0;
@@ -205,38 +192,25 @@ int main() {
  //   OneSecond += deltaTime;
 
     //   Entity movement will probably look like
-    //   0. Clear Previous frame Acceleration.
+    //   0. Clear Previous frame Acceleration. That will not be done at the end of frame.
+    //   any entity that changes their acceleration should be responsible for clearing that same
+    //   acceleration.
     //   1. Construct new Acceleration
     //   2. Generate a delta movement
     //   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
     //   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
+    player_acceleration(&global_entities.entities[entity_id], inputStrength);
+
+    v2 player_movement_delta = generate_delta_movement(global_entities.entities[entity_id], 
+                                                       deltaTime);
+
+    collision_resolution_for_move(&global_entities.entities[entity_id], global_world, 
+                                  player_movement_delta, deltaTime);
+    //global_entities.entities[entity_id].pos += player_movement_delta;
+    //global_entities.entities[entity_id].velocity += global_entities.entities[entity_id].acceleration * deltaTime;
     
-    player_entity.acceleration.x = 0;
-    player_entity.acceleration.y = 0;
-    if (IsKeyDown(KEY_W)) {
-      player_entity.acceleration.y--;
-    }
-    if (IsKeyDown(KEY_A)) {
-      player_entity.acceleration.x--;
-    }
-    if (IsKeyDown(KEY_S)) {
-      player_entity.acceleration.y++;
-    }
-    if (IsKeyDown(KEY_D)) {
-      player_entity.acceleration.x++;
-    }
-
-    f32 ddPosLength = LengthSq(player_entity.acceleration);
-    if (ddPosLength > 1.0f) {
-      player_entity.acceleration *= 1.0f / SquareRoot(ddPosLength);
-    }
-    player_entity.acceleration *= inputStrength;
-    player_entity.acceleration += -4.0f * player_entity.velocity;
-
-    v2 entity_delta_movement = generate_delta_movement(player_entity, deltaTime);
-    collision_resolution_for_move(&player_entity, global_world, entity_delta_movement, deltaTime);
-
-    follow_camera.target = {player_entity.pos.x, player_entity.pos.y};
+    follow_camera.target = {global_entities.entities[entity_id].pos.x, 
+                            global_entities.entities[entity_id].pos.y};
 
     BeginDrawing();
       
@@ -264,9 +238,8 @@ int main() {
           }
         }
         
+        entity_loop(&global_entities);
 
-        Rectangle player = {player_entity.pos.x, player_entity.pos.y, player_entity.dim.x, player_entity.dim.y};
-        DrawRectangleRec(player, BLUE);
       EndMode2D();
 // shader work later
 //      BeginShaderMode(testShader);
