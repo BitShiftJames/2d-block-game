@@ -5,6 +5,9 @@
 #include "jamTypes.h"
 #include "raylib.h"
 
+#define Minimum(a, b) ((a) < (b) ? (a) : (b))
+#define Maximum(a, b) ((a) > (b) ? (a) : (b))
+
 struct v2 {
   union {
     struct {

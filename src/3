@@ -33,10 +33,10 @@ b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
 jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
   jam_rect2 Result = {};
   
-  Result.x = B.x - A.Max.x;
-  Result.Max.x = B.Max.x - A.x;
-  Result.y = B.y - A.Max.y;
-  Result.Max.y = B.Max.y - A.y;
+  Result.x = B.x - (A.x + A.Max.x);
+  Result.Max.x = (B.x + B.Max.x) - A.x;
+  Result.y = B.y - (A.y + A.Max.y);
+  Result.Max.y = (B.Max.y + B.y) - A.y;
   
   return Result;
 }
@@ -63,25 +63,16 @@ int main() {
   global_world.Height = 200;
   global_world.TileSize = 16;
   global_world.map = (tile *)MemAlloc(sizeof(tile) * global_world.Width * global_world.Height);
-  v2 spawn_location = {};
+  
   for (i32 tileY = 0; tileY < global_world.Height; tileY++) {
     for (i32 tileX = 0; tileX < global_world.Width; tileX++) {
       tile CurrentTile = global_world.map[tileY * global_world.Width + tileX];
-      if (tileY > global_world.Height / 2) {
+      if (tileY > global_world.TileSize / 2) {
         if (tileX % 2 == 1) {
           CurrentTile.type = 42;
         } else {
           CurrentTile.type = 43;
         }
-
-      }
-
-      if (tileX > global_world.Width - 40) {
-        CurrentTile.type = 1;
-      }
-
-      if (tileX == global_world.Width / 2 && tileY == (global_world.Height / 2) - 3) {
-        spawn_location = {(f32)tileX * global_world.TileSize, (f32)tileY * global_world.TileSize};
       }
 
       global_world.map[tileY * global_world.Width + tileX] = CurrentTile;
@@ -90,7 +81,7 @@ int main() {
 
   f32 playerWidth = 32;
   f32 playerHeight = 48;
-  v2 playerPos = spawn_location;
+  v2 playerPos = {0, 0};
   v2 Velocity = {};
   f32 inputStrength = 250.0f;
 
@@ -137,8 +128,8 @@ int main() {
     u32 MaxTileY = (floor_f32(Max.y)) / global_world.TileSize;
 
     f32 tMin = 1.0f;
-    for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
-      for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
+    for (u32 TileY = MinTileY; TileY < MaxTileY; TileY++) {
+      for (u32 TileX = MinTileX; TileX < MaxTileX; TileX++) {
         // general accessor function incoming.
         tile CurrentTile = global_world.map[TileY * global_world.Width + TileX];
 
@@ -170,14 +161,12 @@ int main() {
             tMin = Minimum_overlap.x / delta_movement.x;
           }
 
-          break;
-
         }
 
       }
     }
 
-    playerPos += delta_movement * (tMin);
+    playerPos += delta_movement;
     Velocity += ddPos * deltaTime;
     
     follow_camera.target = {playerPos.x, playerPos.y};
