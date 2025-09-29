@@ -1,7 +1,7 @@
 #include "raylib.h"
 #include "jamTypes.h"
 #include "jamMath.h"
-#include <complex>
+
 
 struct tile {
   u32 type;
@@ -29,6 +29,13 @@ b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
            top);
 }
 
+struct entity {
+  v2 pos;
+  v2 velocity;
+  v2 acceleration;
+  v2 dim;
+};
+
 jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
   jam_rect2 Result = {};
   
@@ -38,6 +45,99 @@ jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
   Result.Max.y = B.Max.y - A.y;
   
   return Result;
+}
+
+v2 generate_delta_movement(entity Entity, f32 deltaTime) {
+  v2 Result = {};
+
+  Result = (.5 * Entity.acceleration * (deltaTime * deltaTime)) + (Entity.velocity * deltaTime);
+
+  return Result;
+}
+
+void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_movement, f32 deltaTime) {
+
+    v2 new_entity_position = Entity->pos + delta_movement;
+
+    v2 Min = {Minimum(Entity->pos.x, new_entity_position.x), 
+              Minimum(Entity->pos.y, new_entity_position.y)};
+
+    v2 Max = {Maximum(Entity->pos.x + Entity->dim.x, new_entity_position.x + Entity->dim.x), 
+              Maximum(Entity->pos.y + Entity->dim.y, new_entity_position.y + Entity->dim.y)};
+
+    jam_rect2 player_collision_rect = JamRectMinMax(Min, Max);
+
+    f32 tMin = 1.0f;
+    v2 normal = {};
+
+    u32 MinTileX = (floor_f32(Min.x)) / global_world.TileSize;
+    u32 MinTileY = (floor_f32(Min.y)) / global_world.TileSize;
+    u32 MaxTileX = (floor_f32(Max.x)) / global_world.TileSize;
+    u32 MaxTileY = (floor_f32(Max.y)) / global_world.TileSize;
+    for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
+      for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
+        // general accessor function incoming.
+        tile CurrentTile = global_world.map[TileY * global_world.Width + TileX];
+
+        if (CurrentTile.type != 0) {
+
+          jam_rect2 TileRect = JamRectMinDim(v2{(f32)(TileX * global_world.TileSize), (f32)(TileY * global_world.TileSize)}, 
+                                             v2{(f32)global_world.TileSize, (f32)global_world.TileSize});
+          // TODO: This could be in a seperate function, maybe.
+          jam_rect2 overlap = rectangle_overlap(player_collision_rect, TileRect);
+          v2 Minimum_overlap = {};
+          
+          if (overlap.Max.x > fabsf(overlap.x)) {
+            Minimum_overlap.x = overlap.x;
+          } else {
+            Minimum_overlap.x = overlap.Max.x;
+          }
+
+          if (overlap.Max.y > fabsf(overlap.y)) {
+            Minimum_overlap.y = overlap.y;
+          } else {
+            Minimum_overlap.y = overlap.Max.y;
+          }
+
+          if (fabsf(Minimum_overlap.x) > fabsf(Minimum_overlap.y)) {
+            if (delta_movement.y != 0.0f) {
+              if (Minimum_overlap.y < 0.0f) {
+                normal.y = 1.0f;
+              } else {
+                normal.y = -1.0f;
+              }
+              tMin = Minimum_overlap.y / delta_movement.y;
+            }
+          } else {
+            if (delta_movement.x != 0.0f) {
+              if (Minimum_overlap.x < 0.0f) {
+                normal.x = -1.0f;
+              } else {
+                normal.x = 1.0f;
+              }
+              tMin = Minimum_overlap.x / delta_movement.x;
+            }
+          }
+
+          break;
+
+        }
+
+      }
+    }
+
+    Entity->pos += delta_movement * (tMin);
+    
+    f32 normalLength = LengthSq(normal);
+    if (normalLength > 0.0f) {
+      Entity->velocity = Entity->velocity - 1*Inner(Entity->velocity, normal) * normal;
+      // this should entirely remove the problem of sticking I was having in the last version.
+      // the problem is back, dumb bass.
+      Entity->acceleration = Entity->acceleration - Inner(Entity->acceleration, normal) * normal;
+    } else {
+    }
+
+    Entity->velocity += Entity->acceleration * deltaTime;
 }
 
 int main() {
@@ -86,125 +186,57 @@ int main() {
       global_world.map[tileY * global_world.Width + tileX] = CurrentTile;
     }
   }
+  entity player_entity = {};
+  player_entity.dim.x = 32;
+  player_entity.dim.y = 48;
+  player_entity.pos = spawn_location;
 
-  f32 playerWidth = 32;
-  f32 playerHeight = 48;
-  v2 playerPos = spawn_location;
-  v2 Velocity = {};
   f32 inputStrength = 250.0f;
 
   Camera2D follow_camera = {};
-  follow_camera.target = {playerPos.x, playerPos.y};
+  follow_camera.target = {player_entity.pos.x, player_entity.pos.y};
   follow_camera.zoom = 1.0f;
   follow_camera.offset = {(f32)ScreenWidth / 2, (f32)ScreenHeight / 2};
+
+  f32 Gravity = 9.8;
 //f32 OneSecond = 0;
   while (!WindowShouldClose()) {
     f32 deltaTime = GetFrameTime();
  //   OneSecond += deltaTime;
 
-    v2 ddPos = {};
+    //   Entity movement will probably look like
+    //   0. Clear Previous frame Acceleration.
+    //   1. Construct new Acceleration
+    //   2. Generate a delta movement
+    //   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
+    //   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
+    
+    player_entity.acceleration.x = 0;
+    player_entity.acceleration.y = 0;
     if (IsKeyDown(KEY_W)) {
-      ddPos.y--;
+      player_entity.acceleration.y--;
     }
     if (IsKeyDown(KEY_A)) {
-      ddPos.x--;
+      player_entity.acceleration.x--;
     }
     if (IsKeyDown(KEY_S)) {
-      ddPos.y++;
+      player_entity.acceleration.y++;
     }
     if (IsKeyDown(KEY_D)) {
-      ddPos.x++;
+      player_entity.acceleration.x++;
     }
 
-    f32 ddPosLength = LengthSq(ddPos);
+    f32 ddPosLength = LengthSq(player_entity.acceleration);
     if (ddPosLength > 1.0f) {
-      ddPos *= 1.0f / SquareRoot(ddPosLength);
+      player_entity.acceleration *= 1.0f / SquareRoot(ddPosLength);
     }
+    player_entity.acceleration *= inputStrength;
+    player_entity.acceleration += -4.0f * player_entity.velocity;
 
-    ddPos *= inputStrength;
+    v2 entity_delta_movement = generate_delta_movement(player_entity, deltaTime);
+    collision_resolution_for_move(&player_entity, global_world, entity_delta_movement, deltaTime);
 
-    ddPos += -4.0f * Velocity;
-    v2 delta_movement = (.5 * ddPos * (deltaTime * deltaTime)) + (Velocity * deltaTime);
-    v2 new_position = playerPos + delta_movement;
-    v2 Min = {Minimum(playerPos.x, new_position.x), Minimum(playerPos.y, new_position.y)};
-    v2 Max = {Maximum(playerPos.x + playerWidth, new_position.x + playerWidth), Maximum(playerPos.y + playerHeight, new_position.y + playerHeight)};
-    jam_rect2 player_collision_rect = JamRectMinMax(Min, Max);
-
-    u32 MinTileX = (floor_f32(Min.x)) / global_world.TileSize;
-    u32 MinTileY = (floor_f32(Min.y)) / global_world.TileSize;
-    u32 MaxTileX = (floor_f32(Max.x)) / global_world.TileSize;
-    u32 MaxTileY = (floor_f32(Max.y)) / global_world.TileSize;
-
-    f32 tMin = 1.0f;
-    v2 normal = {};
-    for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
-      for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
-        // general accessor function incoming.
-        tile CurrentTile = global_world.map[TileY * global_world.Width + TileX];
-
-        if (CurrentTile.type != 0) {
-
-          v2 TileMin = {(f32)(TileX * global_world.TileSize), (f32)(TileY * global_world.TileSize)}; 
-          v2 TileDim = {(f32)global_world.TileSize, (f32)global_world.TileSize};
-
-          jam_rect2 TileRect = JamRectMinDim(TileMin, TileDim);
-          
-          jam_rect2 overlap = rectangle_overlap(player_collision_rect, TileRect);
-          v2 Minimum_overlap = {};
-          
-          if (overlap.Max.x > fabsf(overlap.x)) {
-            Minimum_overlap.x = overlap.x;
-          } else {
-            Minimum_overlap.x = overlap.Max.x;
-          }
-
-          if (overlap.Max.y > fabsf(overlap.y)) {
-            Minimum_overlap.y = overlap.y;
-          } else {
-            Minimum_overlap.y = overlap.Max.y;
-          }
-
-          if (fabsf(Minimum_overlap.x) > fabsf(Minimum_overlap.y)) {
-            if (delta_movement.y != 0.0f) {
-              if (Minimum_overlap.y < 0.0f) {
-                normal.y = 1.0f;
-              } else {
-                normal.y = -1.0f;
-              }
-              tMin = Minimum_overlap.y / delta_movement.y;
-            }
-          } else {
-            if (delta_movement.x != 0.0f) {
-              if (Minimum_overlap.x < 0.0f) {
-                normal.x = -1.0f;
-              } else {
-                normal.x = 1.0f;
-              }
-              tMin = Minimum_overlap.x / delta_movement.x;
-            }
-          }
-
-          break;
-
-        }
-
-      }
-    }
-
-    playerPos += delta_movement * (tMin);
-    
-    f32 normalLength = LengthSq(normal);
-    if (normalLength > 0.0f) {
-      Velocity = Velocity - 1*Inner(Velocity, normal) * normal;
-      // this should entirely remove the problem of sticking I was having in the last version.
-      ddPos = ddPos - Inner(ddPos, normal) * normal;
-    } else {
-    }
-
-    Velocity += ddPos * deltaTime;
-    
-    follow_camera.target = {playerPos.x, playerPos.y};
-
+    follow_camera.target = {player_entity.pos.x, player_entity.pos.y};
 
     BeginDrawing();
       
@@ -233,10 +265,9 @@ int main() {
         }
         
 
-        Rectangle player = {playerPos.x, playerPos.y, playerWidth, playerHeight};
+        Rectangle player = {player_entity.pos.x, player_entity.pos.y, player_entity.dim.x, player_entity.dim.y};
         DrawRectangleRec(player, BLUE);
       EndMode2D();
-      DrawText(TextFormat("MinTile: (%u, %u)\nMaxTile: (%u, %u)\nPlayer Position (%f, %f)", MinTileX, MinTileY, MaxTileX, MaxTileY, playerPos.x, playerPos.y), 20, 20, 20, WHITE);
 // shader work later
 //      BeginShaderMode(testShader);
 //        DrawTexture(bubbleTexture, 
