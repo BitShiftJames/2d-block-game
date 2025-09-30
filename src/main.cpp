@@ -54,7 +54,6 @@ int main() {
     }
   }
 
-  f32 inputStrength = 250.0f;
 
 
   Camera2D follow_camera = {};
@@ -65,12 +64,13 @@ int main() {
   total_entities global_entities = {};
 
   u8 entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
+  u8 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE, true);
 
   f32 Gravity = 9.8;
-//f32 OneSecond = 0;
+  f32 OneSecond = 0;
   while (!WindowShouldClose()) {
     f32 deltaTime = GetFrameTime();
- //   OneSecond += deltaTime;
+    OneSecond += deltaTime;
 
     //   Entity movement will probably look like
     //   0. Clear Previous frame Acceleration. That will not be done at the end of frame.
@@ -80,26 +80,6 @@ int main() {
     //   2. Generate a delta movement
     //   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
     //   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
-    global_entities.entities[entity_id].acceleration = {0, 0};
-    if (IsKeyDown(KEY_W)) {
-      global_entities.entities[entity_id].acceleration.y--;
-    }
-    if (IsKeyDown(KEY_A)) {
-      global_entities.entities[entity_id].acceleration.x--;
-    }
-    if (IsKeyDown(KEY_S)) {
-      global_entities.entities[entity_id].acceleration.y++;
-    }
-    if (IsKeyDown(KEY_D)) {
-      global_entities.entities[entity_id].acceleration.x++;
-    }
-
-    f32 ddPosLength = LengthSq(global_entities.entities[entity_id].acceleration);
-    if (ddPosLength > 1.0f) {
-      global_entities.entities[entity_id].acceleration *= 1.0f / SquareRoot(ddPosLength);
-    }
-    global_entities.entities[entity_id].acceleration *= inputStrength;
-    global_entities.entities[entity_id].acceleration += -2.0f * global_entities.entities[entity_id].velocity;
 
     //global_entities.entities[entity_id].pos += player_movement_delta;
     //global_entities.entities[entity_id].velocity += global_entities.entities[entity_id].acceleration * deltaTime;
@@ -133,7 +113,7 @@ int main() {
           }
         }
         
-        entity_loop(&global_entities);
+        entity_loop(&global_entities, global_world, deltaTime, OneSecond);
 
       EndMode2D();
 // shader work later
@@ -145,9 +125,9 @@ int main() {
 
     EndDrawing();
 
-//    if (OneSecond >= 1.0f) {
-//      OneSecond = 0;
-//    }
+    if (OneSecond >= 1.0f) {
+      OneSecond = 0;
+    }
 
   }
   CloseWindow();

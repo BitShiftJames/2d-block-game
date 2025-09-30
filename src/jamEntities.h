@@ -5,6 +5,8 @@
 #include "jamMath.h"
 #include "jamTiles.h"
 #include "raylib.h"
+#include "math.h"
+#include <cstdlib>
 
 enum entity_states {
   IGNORE,
@@ -15,12 +17,13 @@ enum entity_states {
 };
 
 struct entity {
-  u8 state;
+  u32 state;
   v2 pos;
   v2 velocity;
-  v2 acceleration;
+  v2 acceleration; // this could be sparse? depends if I need the space.
   v2 dim;
-  b32 debug_render;
+  i32 stateTime; // Max amount of seconds that an entity can be in a state.
+  b32 debug_render; // this is a boolean later on it will probably be collapsed into flags.
 };
 
 struct total_entities {
@@ -65,10 +68,11 @@ u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states Sta
   return entity_id;
 }
 
-v2 generate_delta_movement(entity Entity, f32 deltaTime) {
+v2 generate_delta_movement(entity *Entity, f32 deltaTime) {
   v2 Result = {};
 
-  Result = (.5 * Entity.acceleration * (deltaTime * deltaTime)) + (Entity.velocity * deltaTime);
+  Entity->acceleration += -2.0f * Entity->velocity;
+  Result = (.5 * Entity->acceleration * (deltaTime * deltaTime)) + (Entity->velocity * deltaTime);
 
   return Result;
 }
@@ -171,18 +175,108 @@ void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_
 // it might be worth to do two entity loops rendering and logic
 // with a max entity of 256 two loops of 256 isn't really that bad.
 // although with spatial hashing that will probably be even less.
-void entity_loop(total_entities *global_entities, world global_world, f32 deltaTime) {
+
+void entity_wonder(entity *Entity) {
+
+    if (Entity->stateTime <= 0) {
+      Entity->stateTime = 10;
+      Entity->state = IDLE;
+    }
+
+    f32 speed = 50;
+    if (Entity->velocity.x > 0) {
+      Entity->acceleration = v2{1.0f * speed, 0};
+    } else {
+      Entity->acceleration = v2{-1.0f * speed, 0};
+    }
+
+
+}
+
+void entity_idle(entity *Entity) {
+    if (Entity->stateTime <= 0) {
+      Entity->stateTime = 5;
+      Entity->state = WONDER;
+      f32 direction = (abs(rand()) > (RAND_MAX / 2) ? -1.0 : 1.0);
+      f32 speed = 200;
+      Entity->acceleration = v2{direction * speed, 0};
+    } 
+
+}
+
+void entity_ignore(entity *Entity, f32 inputStrength) {
+    if (IsKeyDown(KEY_W)) {
+      Entity->acceleration.y--;
+    }
+    if (IsKeyDown(KEY_A)) {
+      Entity->acceleration.x--;
+    }
+    if (IsKeyDown(KEY_S)) {
+      Entity->acceleration.y++;
+    }
+    if (IsKeyDown(KEY_D)) {
+      Entity->acceleration.x++;
+    }
+
+    f32 ddPosLength = LengthSq(Entity->acceleration);
+    if (ddPosLength > 1.0f) {
+      Entity->acceleration *= 1.0f / SquareRoot(ddPosLength);
+    }
+    Entity->acceleration *= inputStrength;
+}
+
+void entity_loop(total_entities *global_entities, world global_world, f32 deltaTime, f32 OneSecond) {
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];
+    f32 inputStrength = 250.0f;
+    global_entities->entities[entity_index].acceleration = {0, 0}
 
-    v2 entity_movement_delta = generate_delta_movement(global_entities->entities[entity_index], 
+    if (currentEntity.state && (OneSecond >= 1.0f)) {
+      global_entities->entities[entity_index].stateTime -= 1;
+    }
+
+    switch (currentEntity.state) {
+        case IGNORE: {
+          entity_ignore(&global_entities->entities[entity_index], inputStrength);
+        } break;
+        case IDLE: {
+          entity_idle(&global_entities->entities[entity_index]);
+        } break;
+        case WONDER: {
+          entity_wonder(&global_entities->entities[entity_index]);
+        } break;
+        case CHASE: {
+        } break;
+        case ATTACK: {
+        } break;
+        default: {
+          // this is an error.
+        }
+    }
+    v2 entity_movement_delta = generate_delta_movement(&global_entities->entities[entity_index], 
                                                        deltaTime);
 
     collision_resolution_for_move(&global_entities->entities[entity_index], global_world, 
                                   entity_movement_delta, deltaTime);
-
-    DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
-                   Vector2{currentEntity.dim.x, currentEntity.dim.y}, WHITE);
+    
+    switch (currentEntity.state) {
+      case IGNORE: {
+        DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
+                       Vector2{currentEntity.dim.x, currentEntity.dim.y}, WHITE);
+      } break;
+      case IDLE: {
+        DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
+                       Vector2{currentEntity.dim.x, currentEntity.dim.y}, GREEN);
+      } break;
+      case WONDER: {
+        DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
+                       Vector2{currentEntity.dim.x, currentEntity.dim.y}, YELLOW);
+      } break;
+      case CHASE: {
+      } break;
+      case ATTACK: {
+      } break;
+    }
   }
 }
 
