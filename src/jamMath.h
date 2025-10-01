@@ -66,6 +66,13 @@ v2& operator*=(v2& A, f32 Scalar) {
   return A;
 }
 
+v2& operator*=(v2& A, v2 B) {
+  A.x *= B.x;
+  A.y *= B.y;
+
+  return A;
+}
+
 v2& operator+=(v2& a, v2 b) {
   a.x += b.x;
   a.y += b.y;

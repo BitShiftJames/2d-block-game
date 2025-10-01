@@ -54,48 +54,12 @@ jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
   return Result;
 }
 
-u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State, b32 debug_state) {
-  u8 entity_id;
-  if (global_entities->entity_count < ArrayCount(global_entities->entities) - 1) {
-    global_entities->entities[global_entities->entity_count].dim = dim;
-    global_entities->entities[global_entities->entity_count].pos = pos;
-    global_entities->entities[global_entities->entity_count].state = State;
-    global_entities->entities[global_entities->entity_count].debug_render = debug_state;
+jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
+    u32 MinTileX = (floor_f32(A.Min.x)) / global_world.TileSize;
+    u32 MinTileY = (floor_f32(A.Min.y)) / global_world.TileSize;
+    u32 MaxTileX = (floor_f32(A.Max.x)) / global_world.TileSize;
+    u32 MaxTileY = (floor_f32(A.Max.y)) / global_world.TileSize;
 
-    entity_id = global_entities->entity_count++;
-  }
-
-  return entity_id;
-}
-
-v2 generate_delta_movement(entity *Entity, f32 deltaTime) {
-  v2 Result = {};
-
-  Entity->acceleration += -2.0f * Entity->velocity;
-  Result = (.5 * Entity->acceleration * (deltaTime * deltaTime)) + (Entity->velocity * deltaTime);
-
-  return Result;
-}
-
-void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_movement, f32 deltaTime) {
-
-    v2 new_entity_position = Entity->pos + delta_movement;
-
-    v2 Min = {Minimum(Entity->pos.x, new_entity_position.x), 
-              Minimum(Entity->pos.y, new_entity_position.y)};
-
-    v2 Max = {Maximum(Entity->pos.x + Entity->dim.x, new_entity_position.x + Entity->dim.x), 
-              Maximum(Entity->pos.y + Entity->dim.y, new_entity_position.y + Entity->dim.y)};
-
-    jam_rect2 player_collision_rect = JamRectMinMax(Min, Max);
-
-    f32 tMin = 1.0f;
-    v2 normal = {};
-
-    u32 MinTileX = (floor_f32(Min.x)) / global_world.TileSize;
-    u32 MinTileY = (floor_f32(Min.y)) / global_world.TileSize;
-    u32 MaxTileX = (floor_f32(Max.x)) / global_world.TileSize;
-    u32 MaxTileY = (floor_f32(Max.y)) / global_world.TileSize;
     jam_rect2 TileRect = {};
     for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
       for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
@@ -123,6 +87,49 @@ void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_
 
       }
     }
+
+  return TileRect;
+
+}
+
+u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State, b32 debug_state) {
+  u8 entity_id;
+  if (global_entities->entity_count < ArrayCount(global_entities->entities) - 1) {
+    global_entities->entities[global_entities->entity_count].dim = dim;
+    global_entities->entities[global_entities->entity_count].pos = pos;
+    global_entities->entities[global_entities->entity_count].state = State;
+    global_entities->entities[global_entities->entity_count].debug_render = debug_state;
+
+    entity_id = global_entities->entity_count++;
+  }
+
+  return entity_id;
+}
+
+v2 generate_delta_movement(entity *Entity,f32 deltaTime) {
+  v2 Result = {};
+  // raycast or some check to see if there is something below the player.
+  Entity->acceleration.y += 50;
+  Entity->acceleration += -2.0f * Entity->velocity;
+  Result = (.5 * Entity->acceleration * (deltaTime * deltaTime)) + (Entity->velocity * deltaTime);
+
+  return Result;
+}
+void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_movement, f32 deltaTime) {
+
+    v2 new_entity_position = Entity->pos + delta_movement;
+
+    v2 Min = {Minimum(Entity->pos.x, new_entity_position.x), 
+              Minimum(Entity->pos.y, new_entity_position.y)};
+
+    v2 Max = {Maximum(Entity->pos.x + Entity->dim.x, new_entity_position.x + Entity->dim.x), 
+              Maximum(Entity->pos.y + Entity->dim.y, new_entity_position.y + Entity->dim.y)};
+
+    jam_rect2 player_collision_rect = JamRectMinMax(Min, Max);
+
+    f32 tMin = 1.0f;
+    v2 normal = {};
+    jam_rect2 TileRect = collision_rect_construction(player_collision_rect, global_world);
 
     if (AABBcollisioncheck(player_collision_rect, TileRect)) {
       jam_rect2 overlap = rectangle_overlap(player_collision_rect, TileRect);
@@ -229,7 +236,7 @@ void entity_loop(total_entities *global_entities, world global_world, f32 deltaT
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];
     f32 inputStrength = 250.0f;
-    global_entities->entities[entity_index].acceleration = {0, 0}
+    global_entities->entities[entity_index].acceleration = {0, 0};
 
     if (currentEntity.state && (OneSecond >= 1.0f)) {
       global_entities->entities[entity_index].stateTime -= 1;
