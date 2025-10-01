@@ -14,6 +14,7 @@ struct world {
   u16 Width;
   u16 Height;
 
+  f32 gravity_constant;
 
   u16 TileSize;
   tile *map;

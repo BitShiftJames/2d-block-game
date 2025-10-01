@@ -32,10 +32,10 @@ struct total_entities {
 };
 
 b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
-  b32 left = A.x + A.Max.x < B.x;
-  b32 right = A.x > B.x + B.Max.x;
-  b32 bottom = A.y + A.Max.y < B.y;
-  b32 top = A.y > B.Max.y + B.y;
+  b32 left = A.Max.x < B.x;
+  b32 right = A.x > B.Max.x;
+  b32 bottom = A.Max.y < B.y;
+  b32 top = A.y > B.Max.y;
   
   return !(left   ||
            right  ||
@@ -106,15 +106,22 @@ u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states Sta
   return entity_id;
 }
 
-v2 generate_delta_movement(entity *Entity,f32 deltaTime) {
+v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {
   v2 Result = {};
   // raycast or some check to see if there is something below the player.
-  Entity->acceleration.y += 50;
-  Entity->acceleration += -2.0f * Entity->velocity;
+  f32 padding = 1;
+  f32 drag_coefficent = 2.0f;
+  jam_rect2 ground_box = JamRectMinDim(v2{Entity->pos.x + padding, Entity->pos.y + (Entity->dim.y - padding)}, v2{Entity->dim.x - (padding * 2), 4});
+  jam_rect2 tile_box = collision_rect_construction(ground_box, global_world);
+  if (!AABBcollisioncheck(ground_box, tile_box)) {
+    Entity->acceleration.y += global_world.gravity_constant;
+  }
+  Entity->acceleration += -drag_coefficent * Entity->velocity;
   Result = (.5 * Entity->acceleration * (deltaTime * deltaTime)) + (Entity->velocity * deltaTime);
 
   return Result;
 }
+
 void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_movement, f32 deltaTime) {
 
     v2 new_entity_position = Entity->pos + delta_movement;
@@ -260,7 +267,7 @@ void entity_loop(total_entities *global_entities, world global_world, f32 deltaT
           // this is an error.
         }
     }
-    v2 entity_movement_delta = generate_delta_movement(&global_entities->entities[entity_index], 
+    v2 entity_movement_delta = generate_delta_movement(&global_entities->entities[entity_index], global_world,
                                                        deltaTime);
 
     collision_resolution_for_move(&global_entities->entities[entity_index], global_world, 

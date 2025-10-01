@@ -28,6 +28,7 @@ int main() {
   global_world.Width = 500;
   global_world.Height = 200;
   global_world.TileSize = 16;
+  global_world.gravity_constant = 50;
   global_world.map = (tile *)MemAlloc(sizeof(tile) * global_world.Width * global_world.Height);
   v2 spawn_location = {};
   for (i32 tileY = 0; tileY < global_world.Height; tileY++) {

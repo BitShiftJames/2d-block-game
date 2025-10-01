@@ -50,6 +50,15 @@ v2 operator-(v2 A, v2 B) {
   return Result;
 }
 
+v2 operator-(v2 A, f32 Scaler) {
+  v2 Result = {};
+
+  Result.x = A.x - Scaler;
+  Result.y = A.y - Scaler;
+
+  return Result;
+}
+
 v2 operator*(v2 A, v2 B) {
   v2 Result = {};
 
