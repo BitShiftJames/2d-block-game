@@ -9,6 +9,7 @@
 #include <cstdlib>
 
 enum entity_states {
+
   IGNORE,
   IDLE,
   WONDER,
@@ -17,6 +18,7 @@ enum entity_states {
 };
 
 struct entity {
+
   u32 state;
   v2 pos;
   v2 velocity;
@@ -27,11 +29,13 @@ struct entity {
 };
 
 struct total_entities {
+
   u8 entity_count;
   entity entities[256];
 };
 
 b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
+
   b32 left = A.Max.x < B.x;
   b32 right = A.x > B.Max.x;
   b32 bottom = A.Max.y < B.y;
@@ -44,6 +48,7 @@ b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
 }
 
 jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
+
   jam_rect2 Result = {};
   
   Result.x = B.x - A.Max.x;
@@ -55,6 +60,7 @@ jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
 }
 
 jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
+
     u32 MinTileX = (floor_f32(A.Min.x)) / global_world.TileSize;
     u32 MinTileY = (floor_f32(A.Min.y)) / global_world.TileSize;
     u32 MaxTileX = (floor_f32(A.Max.x)) / global_world.TileSize;
@@ -89,10 +95,10 @@ jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
     }
 
   return TileRect;
-
 }
 
 u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State, b32 debug_state) {
+
   u8 entity_id;
   if (global_entities->entity_count < ArrayCount(global_entities->entities) - 1) {
     global_entities->entities[global_entities->entity_count].dim = dim;
@@ -107,6 +113,7 @@ u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states Sta
 }
 
 v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {
+
   v2 Result = {};
   // raycast or some check to see if there is something below the player.
   f32 padding = 1;
@@ -186,9 +193,6 @@ void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_
 
     Entity->velocity += Entity->acceleration * deltaTime;
 }
-// it might be worth to do two entity loops rendering and logic
-// with a max entity of 256 two loops of 256 isn't really that bad.
-// although with spatial hashing that will probably be even less.
 
 void entity_wonder(entity *Entity) {
 
@@ -203,11 +207,10 @@ void entity_wonder(entity *Entity) {
     } else {
       Entity->acceleration = v2{-1.0f * speed, 0};
     }
-
-
 }
 
 void entity_idle(entity *Entity) {
+
     if (Entity->stateTime <= 0) {
       Entity->stateTime = 5;
       Entity->state = WONDER;
@@ -215,10 +218,10 @@ void entity_idle(entity *Entity) {
       f32 speed = 200;
       Entity->acceleration = v2{direction * speed, 0};
     } 
-
 }
 
 void entity_ignore(entity *Entity, f32 inputStrength) {
+
     if (IsKeyDown(KEY_W)) {
       Entity->acceleration.y--;
     }
@@ -239,7 +242,15 @@ void entity_ignore(entity *Entity, f32 inputStrength) {
     Entity->acceleration *= inputStrength;
 }
 
+//   Entity movement looks like
+//   0. Clear Previous frame Acceleration. 
+//   1. Construct new Acceleration
+//   2. Generate a delta movement
+//   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
+//   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
+
 void entity_loop(total_entities *global_entities, world global_world, f32 deltaTime, f32 OneSecond) {
+
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];
     f32 inputStrength = 250.0f;
@@ -276,7 +287,7 @@ void entity_loop(total_entities *global_entities, world global_world, f32 deltaT
     switch (currentEntity.state) {
       case IGNORE: {
         DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
-                       Vector2{currentEntity.dim.x, currentEntity.dim.y}, WHITE);
+                       Vector2{currentEntity.dim.x, currentEntity.dim.y}, PURPLE);
       } break;
       case IDLE: {
         DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 

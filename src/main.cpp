@@ -13,6 +13,7 @@ int main() {
   u32 flags = FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT;// FLAG_WINDOW_TOPMOST;
   SetConfigFlags(flags);
   InitWindow(ScreenWidth, ScreenHeight, "Restarting from scratch");
+  SetTraceLogLevel(LOG_ALL);
   SetTargetFPS(60);
   
 //  Image bubbleTest = LoadImage("../assets/bubbles.png");
@@ -21,8 +22,16 @@ int main() {
   Image ImgtileSheet = LoadImage("../assets/tilesheet.png");
   Texture2D TextileSheet = LoadTextureFromImage(ImgtileSheet);
   UnloadImage(ImgtileSheet);
-// passing in 0 tells raylib to load default. 
-  Shader testShader = LoadShader(0, "../shaders/lighting.frag");
+  Shader testShader = LoadShader("../shaders/basic.vert", "../shaders/lighting.frag");
+  
+  i32 lightLoc = GetShaderLocation(testShader, "lightPos");
+  i32 lightLoc2 = GetShaderLocation(testShader, "lightPos2");
+
+  int ambientLoc = GetShaderLocation(testShader, "ambient");
+  f32 ambientValue[4] = {
+    5.0f, 5.0f, 5.0f, 1.0f,
+  };
+  SetShaderValue(testShader, ambientLoc, ambientValue, SHADER_UNIFORM_VEC4);
 
   world global_world = {0};
   global_world.Width = 500;
@@ -73,18 +82,20 @@ int main() {
     f32 deltaTime = GetFrameTime();
     OneSecond += deltaTime;
 
-    //   Entity movement will probably look like
-    //   0. Clear Previous frame Acceleration. That will not be done at the end of frame.
-    //   any entity that changes their acceleration should be responsible for clearing that same
-    //   acceleration.
-    //   1. Construct new Acceleration
-    //   2. Generate a delta movement
-    //   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
-    //   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
+    f32 lightPos[3] = {
+      global_entities.entities[entity_id].pos.x + (global_entities.entities[entity_id].dim.x / 2), 
+      global_entities.entities[entity_id].pos.y + (global_entities.entities[entity_id].dim.y / 2), 
+      -20,
+    };
+    SetShaderValue(testShader, lightLoc, lightPos, SHADER_UNIFORM_VEC3);
 
-    //global_entities.entities[entity_id].pos += player_movement_delta;
-    //global_entities.entities[entity_id].velocity += global_entities.entities[entity_id].acceleration * deltaTime;
-    
+    f32 lightPos2[3] = {
+      global_entities.entities[horse_id].pos.x + (global_entities.entities[horse_id].dim.x / 2), 
+      global_entities.entities[horse_id].pos.y + (global_entities.entities[horse_id].dim.y / 2), 
+      -20,
+    };
+    SetShaderValue(testShader, lightLoc2, lightPos2, SHADER_UNIFORM_VEC3);
+
     follow_camera.target = {global_entities.entities[entity_id].pos.x, 
                             global_entities.entities[entity_id].pos.y};
 
@@ -92,6 +103,7 @@ int main() {
       
       ClearBackground(BLACK);
 
+      BeginShaderMode(testShader);
       BeginMode2D(follow_camera);
         for (i32 tileY = 0; tileY < global_world.Height; tileY++) {
           for (i32 tileX = 0; tileX < global_world.Width; tileX++) {
@@ -115,14 +127,9 @@ int main() {
         }
         
         entity_loop(&global_entities, global_world, deltaTime, OneSecond);
+      EndShaderMode();
 
       EndMode2D();
-// shader work later
-//      BeginShaderMode(testShader);
-//        DrawTexture(bubbleTexture, 
-//                    ScreenWidth / 2 - bubbleTexture.width / 2, 
-//                    ScreenHeight / 2 - bubbleTexture.height / 2, WHITE);
-//      EndShaderMode();
 
     EndDrawing();
 
@@ -131,6 +138,7 @@ int main() {
     }
 
   }
+
   CloseWindow();
 
   return 0;
