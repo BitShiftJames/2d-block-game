@@ -105,6 +105,15 @@ v2 operator*(v2 A, f32 Scalar) {
   return Result;
 }
 
+v2 operator/(v2 A, f32 Scalar) {
+  v2 Result = {};
+
+  Result.x = A.x / Scalar;
+  Result.y = A.y / Scalar;
+
+  return Result;
+}
+
 v2 operator*(f32 Scalar, v2 A) {
   v2 Result = {};
 

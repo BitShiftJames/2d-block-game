@@ -4,9 +4,6 @@
 #include "jamEntities.h"
 #include "jamTiles.h"
 
-
-
-
 int main() {
   i32 ScreenWidth = 800;
   i32 ScreenHeight = 400;
@@ -22,16 +19,24 @@ int main() {
   Image ImgtileSheet = LoadImage("../assets/tilesheet.png");
   Texture2D TextileSheet = LoadTextureFromImage(ImgtileSheet);
   UnloadImage(ImgtileSheet);
+  
+  u32 LightTextureSize = 256;
+  Color *lightValues = (Color *)malloc(LightTextureSize * LightTextureSize * sizeof(Color));
+  Image lightImage = {};
+  lightImage.data = lightValues;
+  lightImage.width = LightTextureSize;
+  lightImage.height = LightTextureSize;
+  lightImage.mipmaps = 1;
+  lightImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+  Texture2D LightTexture = LoadTextureFromImage(lightImage);
+  
   Shader testShader = LoadShader("../shaders/basic.vert", "../shaders/lighting.frag");
   
-  i32 lightLoc = GetShaderLocation(testShader, "lightPos");
-  i32 lightLoc2 = GetShaderLocation(testShader, "lightPos2");
-
-  int ambientLoc = GetShaderLocation(testShader, "ambient");
-  f32 ambientValue[4] = {
-    5.0f, 5.0f, 5.0f, 1.0f,
-  };
-  SetShaderValue(testShader, ambientLoc, ambientValue, SHADER_UNIFORM_VEC4);
+  i32 RenderInformationLoc = GetShaderLocation(testShader, "render_distance_information");
+  i32 LightMaploc = GetShaderLocation(testShader, "lightMap");
+  
+  SetShaderValueTexture(testShader, LightMaploc, LightTexture);
 
   world global_world = {0};
   global_world.Width = 500;
@@ -40,14 +45,16 @@ int main() {
   global_world.gravity_constant = 50;
   global_world.map = (tile *)MemAlloc(sizeof(tile) * global_world.Width * global_world.Height);
   v2 spawn_location = {};
-  for (i32 tileY = 0; tileY < global_world.Height; tileY++) {
-    for (i32 tileX = 0; tileX < global_world.Width; tileX++) {
-      tile CurrentTile = global_world.map[tileY * global_world.Width + tileX];
+  for (u32 tileY = 0; tileY < global_world.Height; tileY++) {
+    for (u32 tileX = 0; tileX < global_world.Width; tileX++) {
+      tile CurrentTile = getTile(global_world, tileX, tileY);
       if (tileY > global_world.Height / 2) {
         if (tileX % 2 == 1) {
           CurrentTile.type = 42;
+          CurrentTile.light = 0.5f;
         } else {
           CurrentTile.type = 43;
+          CurrentTile.light = 0.25f;
         }
 
       }
@@ -82,22 +89,47 @@ int main() {
     f32 deltaTime = GetFrameTime();
     OneSecond += deltaTime;
 
-    f32 lightPos[3] = {
-      global_entities.entities[entity_id].pos.x + (global_entities.entities[entity_id].dim.x / 2), 
-      global_entities.entities[entity_id].pos.y + (global_entities.entities[entity_id].dim.y / 2), 
-      -20,
-    };
-    SetShaderValue(testShader, lightLoc, lightPos, SHADER_UNIFORM_VEC3);
-
-    f32 lightPos2[3] = {
-      global_entities.entities[horse_id].pos.x + (global_entities.entities[horse_id].dim.x / 2), 
-      global_entities.entities[horse_id].pos.y + (global_entities.entities[horse_id].dim.y / 2), 
-      -20,
-    };
-    SetShaderValue(testShader, lightLoc2, lightPos2, SHADER_UNIFORM_VEC3);
+    if (IsKeyDown(KEY_MINUS) && follow_camera.zoom > .1f) {
+      follow_camera.zoom -= .05;
+    }
+    if (IsKeyDown(KEY_EQUAL) && follow_camera.zoom < 3.0f) {
+      follow_camera.zoom += .05;
+    }
 
     follow_camera.target = {global_entities.entities[entity_id].pos.x, 
                             global_entities.entities[entity_id].pos.y};
+
+    update_entity_loop(&global_entities, global_world, deltaTime, OneSecond);
+
+    v2 render_distance = {200, 115};
+    v2 minimum = {floor_f32((global_entities.entities[entity_id].pos.x / global_world.TileSize) - (render_distance.x / 2)), 
+                  floor_f32((global_entities.entities[entity_id].pos.y / global_world.TileSize) - (render_distance.y / 2))};
+
+    jam_rect2 render_rectangle = JamRectMinDim(minimum, render_distance);
+
+    f32 Render_distance_values[4] = {
+      render_rectangle.Min.x,
+      render_rectangle.Min.y,
+      render_rectangle.Max.x,
+      render_rectangle.Max.y,
+    };
+
+    SetShaderValue(testShader, RenderInformationLoc, Render_distance_values, SHADER_UNIFORM_VEC4);
+
+    for (u32 tileY = render_rectangle.Min.y; tileY < render_rectangle.Max.y; tileY++) { 
+      for (u32 tileX = render_rectangle.Min.x; tileX < render_rectangle.Max.x; tileX++) {
+        // map tiles to light map.
+          tile CurrentTile = getTile(global_world, tileX, tileY);
+
+          u32 lightX = (u32)((f32)tileX / (f32)render_rectangle.Max.x) * 256.0f;
+          u32 lightY = (u32)((f32)tileY / (f32)render_rectangle.Max.y) * 256.0f;
+          u8 color_value = (u8)(CurrentTile.light * 255);
+
+          lightValues[lightY * LightTextureSize + lightX] = Color{color_value, color_value, color_value, 255};
+      }
+    }
+
+    UpdateTexture(LightTexture, lightValues);
 
     BeginDrawing();
       
@@ -105,9 +137,9 @@ int main() {
 
       BeginShaderMode(testShader);
       BeginMode2D(follow_camera);
-        for (i32 tileY = 0; tileY < global_world.Height; tileY++) {
-          for (i32 tileX = 0; tileX < global_world.Width; tileX++) {
-            tile CurrentTile = global_world.map[tileY * global_world.Width + tileX];
+        for (u32 tileY = render_rectangle.Min.y; tileY < render_rectangle.Max.y; tileY++) {
+          for (u32 tileX = render_rectangle.Min.x; tileX < render_rectangle.Max.x; tileX++) {
+            tile CurrentTile = getTile(global_world, tileX, tileY);
             // the tiletype of zero in logic is no tile but the tile sheet of 0 is tile 1 so 
             // subtracting one fixes that bias
             i32 ActualTileType = CurrentTile.type - 1;
@@ -126,11 +158,14 @@ int main() {
           }
         }
         
-        entity_loop(&global_entities, global_world, deltaTime, OneSecond);
+        render_entity_loop(&global_entities);
       EndShaderMode();
 
+      DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 5, 5, WHITE);
+      DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 5, 5, RED);
+      DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 5, 5, BLUE);
+      DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 5, 5, PURPLE);
       EndMode2D();
-
     EndDrawing();
 
     if (OneSecond >= 1.0f) {

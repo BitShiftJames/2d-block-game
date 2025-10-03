@@ -20,4 +20,12 @@ struct world {
   tile *map;
 };
 
+tile getTile(world global_world, u32 TileX, u32 TileY) {
+  tile Result = {};
+  if (TileX < global_world.Width && TileY < global_world.Height) {
+    Result = global_world.map[TileY * global_world.Width + TileX];
+  }
+  return Result;
+}
+
 #endif

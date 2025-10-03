@@ -248,9 +248,7 @@ void entity_ignore(entity *Entity, f32 inputStrength) {
 //   2. Generate a delta movement
 //   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
 //   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
-
-void entity_loop(total_entities *global_entities, world global_world, f32 deltaTime, f32 OneSecond) {
-
+void update_entity_loop(total_entities *global_entities, world global_world, f32 deltaTime, f32 OneSecond) {
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];
     f32 inputStrength = 250.0f;
@@ -283,6 +281,13 @@ void entity_loop(total_entities *global_entities, world global_world, f32 deltaT
 
     collision_resolution_for_move(&global_entities->entities[entity_index], global_world, 
                                   entity_movement_delta, deltaTime);
+  }
+
+}
+void render_entity_loop(total_entities *global_entities) {
+
+  for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
+    entity currentEntity = global_entities->entities[entity_index];
     
     switch (currentEntity.state) {
       case IGNORE: {
