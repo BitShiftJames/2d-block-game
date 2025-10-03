@@ -6,7 +6,7 @@
 struct tile {
   u32 type;
   // shader information
-  u32 light;
+  u8 light;
 };
 
 struct world {
