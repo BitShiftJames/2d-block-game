@@ -292,7 +292,7 @@ void render_entity_loop(total_entities *global_entities) {
     switch (currentEntity.state) {
       case IGNORE: {
         DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
-                       Vector2{currentEntity.dim.x, currentEntity.dim.y}, PURPLE);
+                       Vector2{currentEntity.dim.x, currentEntity.dim.y}, RED);
       } break;
       case IDLE: {
         DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
