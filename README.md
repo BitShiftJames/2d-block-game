@@ -10,6 +10,6 @@ mkdir build && cd build
 
 cmake ..
 
-I have no idea if the below actually works because I use msbuild. Yes filthy windows user, I know.
+cmake --build . --config Release[^1]
 
-cmake --build . --config Release
+[^1]: I have no idea if the below actually works because I use msbuild. Yes filthy windows user, I know.
