@@ -21,15 +21,23 @@ int main() {
   UnloadImage(ImgtileSheet);
   
   u32 LightTextureSize = 256;
-  Color *lightValues = (Color *)malloc(LightTextureSize * LightTextureSize * sizeof(Color));
-  Image lightImage = {};
-  lightImage.data = lightValues;
-  lightImage.width = LightTextureSize;
-  lightImage.height = LightTextureSize;
-  lightImage.mipmaps = 1;
-  lightImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+  Color *injectValues = (Color *)malloc(LightTextureSize * LightTextureSize * sizeof(Color));
+  Image injectImage = {};
+  injectImage.data = injectValues;
+  injectImage.width = LightTextureSize;
+  injectImage.height = LightTextureSize;
+  injectImage.mipmaps = 1;
+  injectImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 
-  Texture2D LightTexture = LoadTextureFromImage(lightImage);
+  Color *propagationValues = (Color *)malloc(LightTextureSize * LightTextureSize * sizeof(Color));
+  Image propagationImage = {};
+  propagationImage.data = propagationValues;
+  propagationImage.width = LightTextureSize;
+  propagationImage.height = LightTextureSize;
+  propagationImage.mipmaps = 1;
+  propagationImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+  Texture2D LightTexture = LoadTextureFromImage(propagationImage);
 
   Image blueImage = GenImageColor(LightTextureSize, LightTextureSize, BLUE);
   Texture2D fallBack = LoadTextureFromImage(blueImage);
@@ -41,8 +49,8 @@ int main() {
   i32 RenderMaximumLoc = GetShaderLocation(testShader, "renderMaximum");
 
   i32 LightMaploc = GetShaderLocation(testShader, "texture1");
+  f32 LightFallOff = 0.5f;
   
-
   world global_world = {0};
   global_world.Width = 500;
   global_world.Height = 200;
@@ -57,7 +65,7 @@ int main() {
       if (tileY > global_world.Height / 2) {
         if (tileX % 2 == 1) {
           CurrentTile.type = 42;
-          CurrentTile.light = 255;
+          CurrentTile.light = 0;
         } else {
           CurrentTile.type = 43;
           CurrentTile.light = 255;
@@ -130,19 +138,43 @@ int main() {
     SetShaderValue(testShader, RenderMinimumLoc, RenderMinimum, SHADER_UNIFORM_VEC2);
     SetShaderValue(testShader, RenderMaximumLoc, RenderMaximum, SHADER_UNIFORM_VEC2);
 
+    // new idea seperation of the light pass into two phases one where we inject all the tile light data into the lightmap.
+    // and then we do the propagation. Now for propagation we might be lossing the ability to piggy back off the tile light data buffer
+    // In a way that allows for only have one buffer of color data, but we should get more verbose behavior when dealing with the light map.
+    // Once the propagation is working. There needs to be a check on the possibility of doing just one loop.
     for (u32 LightY = 0; LightY < LightTextureSize; LightY++) {
       for (u32 LightX = 0; LightX < LightTextureSize; LightX++) {
         u32 TileLightY = render_rectangle.Min.y + LightY;
         u32 TileLightX = render_rectangle.Min.x + LightX;
         if (TileLightX > render_rectangle.Max.x || TileLightY > render_rectangle.Max.y) {
-          lightValues[LightY * LightTextureSize + LightX] = Color{255, 0, 255, 255};
+          injectValues[LightY * LightTextureSize + LightX] = Color{255, 0, 255, 255};
         } else {
+
           tile CurrentTile = getTile(global_world, TileLightX, TileLightY);
-          lightValues[LightY * LightTextureSize + LightX] = Color{CurrentTile.light, CurrentTile.light, CurrentTile.light, 255};
+          injectValues[LightY * LightTextureSize + LightX].r = CurrentTile.light;
+          injectValues[LightY * LightTextureSize + LightX].g = CurrentTile.light;
+          injectValues[LightY * LightTextureSize + LightX].b = CurrentTile.light;
+
+          injectValues[LightY * LightTextureSize + LightX].r = jamClamp_u8(injectValues[LightY * LightTextureSize + LightX].r, (u8)0, (u8)255);
+          injectValues[LightY * LightTextureSize + LightX].g = jamClamp_u8(injectValues[LightY * LightTextureSize + LightX].g, (u8)0, (u8)255);
+          injectValues[LightY * LightTextureSize + LightX].b = jamClamp_u8(injectValues[LightY * LightTextureSize + LightX].b, (u8)0, (u8)255);
+
+          // TODO: what can I do with the alpha. In this light stuff
+          injectValues[LightY * LightTextureSize + LightX].a = 255;
         }
       }
     }
-    UpdateTexture(LightTexture, lightValues);
+                
+    for (u32 LightY = 0; LightY < LightTextureSize; LightY++) {
+      for (u32 LightX = 0; LightX < LightTextureSize; LightX++) {
+        // one to one conversion of light values
+        Color currentLight = injectValues[LightY * LightTextureSize + LightX];
+        // check if current light can propagate.
+        propagationValues[LightY * LightTextureSize + LightX] = currentLight;
+      }
+    }
+
+    UpdateTexture(LightTexture, propagationValues);
 
     BeginDrawing();
       

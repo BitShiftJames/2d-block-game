@@ -9,6 +9,9 @@
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
 #define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
 
+u8 jamClamp_u8(u8 x, u8 low, u8 high) {
+  return x > high ? high : (x < low ? low : x);
+}
 struct v2 {
   union {
     struct {
