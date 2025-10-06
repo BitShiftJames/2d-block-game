@@ -12,6 +12,11 @@
 u8 jamClamp_u8(u8 x, u8 low, u8 high) {
   return x > high ? high : (x < low ? low : x);
 }
+
+u16 jamClamp_u16(u16 x, u16 low, u16 high) {
+  return x > high ? high : (x < low ? low : x);
+}
+
 struct v2 {
   union {
     struct {

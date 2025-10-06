@@ -3,6 +3,25 @@
 #include "jamMath.h"
 #include "jamEntities.h"
 #include "jamTiles.h"
+#include <string.h>
+
+Color AddClampColor(Color A, Color B, u16 low, u16 high) {
+  Color Result = {};
+
+  Result.r = (u8)jamClamp_u16(((u16)A.r + (u16)B.r), low, high);
+  Result.g = (u8)jamClamp_u16(((u16)A.g + (u16)B.g), low, high);
+  Result.b = (u8)jamClamp_u16(((u16)A.b + (u16)A.b), low, high);
+
+  return Result;
+}
+
+u8 AddClampColorChannel(u8 A, u8 B, u8 low, u8 high) {
+  u8 Result = 0;
+
+  Result = (u8)jamClamp_u16(((u16)A + (u16)B), (u16)low, (u16)high);
+
+  return Result;
+}
 
 int main() {
   i32 ScreenWidth = 800;
@@ -20,26 +39,28 @@ int main() {
   Texture2D TextileSheet = LoadTextureFromImage(ImgtileSheet);
   UnloadImage(ImgtileSheet);
   
-  u32 LightTextureSize = 256;
-  Color *injectValues = (Color *)malloc(LightTextureSize * LightTextureSize * sizeof(Color));
+  u32 LightTextureDim = 256;
+  u32 LightTextureSize = LightTextureDim * LightTextureDim * sizeof(Color);
+
+  Color *injectValues = (Color *)malloc(LightTextureSize);
   Image injectImage = {};
   injectImage.data = injectValues;
-  injectImage.width = LightTextureSize;
-  injectImage.height = LightTextureSize;
+  injectImage.width = LightTextureDim;
+  injectImage.height = LightTextureDim;
   injectImage.mipmaps = 1;
   injectImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 
-  Color *propagationValues = (Color *)malloc(LightTextureSize * LightTextureSize * sizeof(Color));
+  Color *propagationValues = (Color *)malloc(LightTextureSize);
   Image propagationImage = {};
   propagationImage.data = propagationValues;
-  propagationImage.width = LightTextureSize;
-  propagationImage.height = LightTextureSize;
+  propagationImage.width = LightTextureDim;
+  propagationImage.height = LightTextureDim;
   propagationImage.mipmaps = 1;
   propagationImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 
   Texture2D LightTexture = LoadTextureFromImage(propagationImage);
 
-  Image blueImage = GenImageColor(LightTextureSize, LightTextureSize, BLUE);
+  Image blueImage = GenImageColor(LightTextureDim, LightTextureDim, BLUE);
   Texture2D fallBack = LoadTextureFromImage(blueImage);
   UnloadImage(blueImage);
 
@@ -49,7 +70,7 @@ int main() {
   i32 RenderMaximumLoc = GetShaderLocation(testShader, "renderMaximum");
 
   i32 LightMaploc = GetShaderLocation(testShader, "texture1");
-  f32 LightFallOff = 0.5f;
+  f32 LightFallOff = 0.9f;
   
   world global_world = {0};
   global_world.Width = 500;
@@ -61,14 +82,14 @@ int main() {
   for (u32 tileY = 0; tileY < global_world.Height; tileY++) {
     for (u32 tileX = 0; tileX < global_world.Width; tileX++) {
       tile CurrentTile = getTile(global_world, tileX, tileY);
-      CurrentTile.light = 127;
+      CurrentTile.light = 1;
       if (tileY > global_world.Height / 2) {
-        if (tileX % 2 == 1) {
+        if (tileX % 5 == 0) {
           CurrentTile.type = 42;
-          CurrentTile.light = 0;
+          CurrentTile.light = 255;
         } else {
           CurrentTile.type = 43;
-          CurrentTile.light = 255;
+          CurrentTile.light = 0;
         }
 
       }
@@ -96,7 +117,7 @@ int main() {
   total_entities global_entities = {};
 
   u8 entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
-  u8 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE, true);
+  //u8 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE, true);
 
   f32 Gravity = 9.8;
   f32 OneSecond = 0;
@@ -142,36 +163,66 @@ int main() {
     // and then we do the propagation. Now for propagation we might be lossing the ability to piggy back off the tile light data buffer
     // In a way that allows for only have one buffer of color data, but we should get more verbose behavior when dealing with the light map.
     // Once the propagation is working. There needs to be a check on the possibility of doing just one loop.
-    for (u32 LightY = 0; LightY < LightTextureSize; LightY++) {
-      for (u32 LightX = 0; LightX < LightTextureSize; LightX++) {
+    for (u32 LightY = 0; LightY < LightTextureDim; LightY++) {
+      for (u32 LightX = 0; LightX < LightTextureDim; LightX++) {
         u32 TileLightY = render_rectangle.Min.y + LightY;
         u32 TileLightX = render_rectangle.Min.x + LightX;
         if (TileLightX > render_rectangle.Max.x || TileLightY > render_rectangle.Max.y) {
-          injectValues[LightY * LightTextureSize + LightX] = Color{255, 0, 255, 255};
+          injectValues[LightY * LightTextureDim + LightX] = Color{255, 0, 255, 255};
         } else {
 
           tile CurrentTile = getTile(global_world, TileLightX, TileLightY);
-          injectValues[LightY * LightTextureSize + LightX].r = CurrentTile.light;
-          injectValues[LightY * LightTextureSize + LightX].g = CurrentTile.light;
-          injectValues[LightY * LightTextureSize + LightX].b = CurrentTile.light;
-
-          injectValues[LightY * LightTextureSize + LightX].r = jamClamp_u8(injectValues[LightY * LightTextureSize + LightX].r, (u8)0, (u8)255);
-          injectValues[LightY * LightTextureSize + LightX].g = jamClamp_u8(injectValues[LightY * LightTextureSize + LightX].g, (u8)0, (u8)255);
-          injectValues[LightY * LightTextureSize + LightX].b = jamClamp_u8(injectValues[LightY * LightTextureSize + LightX].b, (u8)0, (u8)255);
+          injectValues[LightY * LightTextureDim + LightX].r = CurrentTile.light;
+          injectValues[LightY * LightTextureDim + LightX].g = CurrentTile.light;
+          injectValues[LightY * LightTextureDim + LightX].b = CurrentTile.light;
 
           // TODO: what can I do with the alpha. In this light stuff
-          injectValues[LightY * LightTextureSize + LightX].a = 255;
+          injectValues[LightY * LightTextureDim + LightX].a = 255;
         }
       }
     }
-                
-    for (u32 LightY = 0; LightY < LightTextureSize; LightY++) {
-      for (u32 LightX = 0; LightX < LightTextureSize; LightX++) {
-        // one to one conversion of light values
-        Color currentLight = injectValues[LightY * LightTextureSize + LightX];
-        // check if current light can propagate.
-        propagationValues[LightY * LightTextureSize + LightX] = currentLight;
+
+    memset(propagationValues, 0, LightTextureSize);
+    for (u32 LightY = 0; LightY < LightTextureDim; LightY++) {
+      for (u32 LightX = 0; LightX < LightTextureDim; LightX++) {
+        
+        //propagationValues[LightY * LightTextureDim + LightX] = injectValues[LightY * LightTextureDim + LightX];
+        // upcast so clamp works.
+        propagationValues[LightY * LightTextureDim + LightX] = AddClampColor(propagationValues[LightY * LightTextureDim + LightX], 
+                                                                              injectValues[LightY * LightTextureDim + LightX], 0, 255);
+
+        propagationValues[LightY * LightTextureDim + LightX].a = 255;
+
+
+        for (u32 NeigborValueY = LightY - 1; NeigborValueY <= LightY + 1; NeigborValueY++) {
+          for (u32 NeigborValueX = LightX - 1; NeigborValueX <= LightX + 1; NeigborValueX++) {
+            Color PropagationLight = propagationValues[LightY * LightTextureDim + LightX];
+            Color *NeigborPropagationLight = &propagationValues[NeigborValueY * LightTextureDim + NeigborValueX];
+            
+            if ((NeigborValueX == LightX && NeigborValueY == LightY) || (NeigborValueX > LightTextureDim) || (NeigborValueY > LightTextureDim)) { continue; } // current value set or invalid value.
+            
+            if (NeigborPropagationLight->r < PropagationLight.r) {
+              u8 B = jamClamp_u8((u8)((1.0f - LightFallOff)*(f32)PropagationLight.r + LightFallOff*(f32)NeigborPropagationLight->r), 0, 255);
+              NeigborPropagationLight->r = AddClampColorChannel(NeigborPropagationLight->r, B, 0, 255);
+            }
+
+            if (NeigborPropagationLight->g < PropagationLight.g) {
+              u8 B = jamClamp_u8((u8)((1.0f - LightFallOff)*(f32)PropagationLight.g + LightFallOff*(f32)NeigborPropagationLight->g), 0, 255);
+              NeigborPropagationLight->g = AddClampColorChannel(NeigborPropagationLight->g, B, 0, 255);
+            }
+
+            if (NeigborPropagationLight->b < PropagationLight.b) {
+              u8 B = jamClamp_u8((u8)((1.0f - LightFallOff)*(f32)PropagationLight.b + LightFallOff*(f32)NeigborPropagationLight->b), 0, 255);
+              NeigborPropagationLight->b = AddClampColorChannel(NeigborPropagationLight->b, B, 0, 255);
+            }
+
+
+          }
+
+        }
+
       }
+
     }
 
     UpdateTexture(LightTexture, propagationValues);
