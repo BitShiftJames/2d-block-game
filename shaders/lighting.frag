@@ -21,5 +21,5 @@ void main() {
 
   vec4 tint = fragColor * colDiffuse;
 //  finalColor = lightColor; 
-  finalColor = tint * (texColor * lightColor);
+  finalColor = tint * vec4((texColor.rgb * lightColor.rgb), texColor.a);
 }

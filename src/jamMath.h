@@ -9,6 +9,10 @@
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
 #define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
 
+f32 jamClamp_f32(f32 x, f32 low, f32 high) {
+  return x > high ? high : (x < low ? low : x);
+}
+
 u8 jamClamp_u8(u8 x, u8 low, u8 high) {
   return x > high ? high : (x < low ? low : x);
 }
