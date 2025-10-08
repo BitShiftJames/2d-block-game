@@ -4,9 +4,9 @@
 #include "jamTypes.h"
 
 struct tile {
-  i32 type;
+  s32 type;
   // shader information
-  u8 light;
+  u16 light;
 };
 
 struct world {

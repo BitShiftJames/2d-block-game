@@ -9,7 +9,25 @@
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
 #define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
 
+// yes I know I could have made a macro by now but I just don't want to deal with the language specifics for like an hour or two.
+//
 f32 jamClamp_f32(f32 x, f32 low, f32 high) {
+  return x > high ? high : (x < low ? low : x);
+}
+
+s8 jamClamp_s8(s8 x, s8 low, s8 high) {
+  return x > high ? high : (x < low ? low : x);
+}
+
+s16 jamClamp_s16(s16 x, s16 low, s16 high) {
+  return x > high ? high : (x < low ? low : x);
+}
+
+s32 jamClamp_s32(s32 x, s32 low, s32 high) {
+  return x > high ? high : (x < low ? low : x);
+}
+
+s64 jamClamp_s64(s64 x, s64 low, s64 high) {
   return x > high ? high : (x < low ? low : x);
 }
 

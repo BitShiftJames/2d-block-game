@@ -24,7 +24,7 @@ struct entity {
   v2 velocity;
   v2 acceleration; // this could be sparse? depends if I need the space.
   v2 dim;
-  i32 stateTime; // Max amount of seconds that an entity can be in a state.
+  s32 stateTime; // Max amount of seconds that an entity can be in a state.
   b32 debug_render; // this is a boolean later on it will probably be collapsed into flags.
 };
 
@@ -70,7 +70,7 @@ jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
     for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
       for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
         // general accessor function incoming.
-        tile CurrentTile = global_world.map[TileY * global_world.Width + TileX];
+        tile CurrentTile = getTile(global_world, TileX, TileY);
         // okay new theory I need to construct an actual rectangle from all the connecting tiles
         // this assumes a perfect AABB tile collision rect which is 90% of cases but if I want entities to have tile aligned dimensions
         // it would be best to do a field of rectangles to do AABB collision on. That way I can have even more odd collision behaviors

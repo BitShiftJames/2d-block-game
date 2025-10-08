@@ -13,8 +13,8 @@ int main() {
   SetConfigFlags(flags);
   // passing 0 makes raylib window the size of the screen.
   InitWindow(0, 0, "Restarting from scratch");
-  i32 ScreenWidth = GetScreenWidth();
-  i32 ScreenHeight = GetScreenHeight();
+  s32 ScreenWidth = GetScreenWidth();
+  s32 ScreenHeight = GetScreenHeight();
   SetTraceLogLevel(LOG_ALL);
   SetTargetFPS(60);
   
@@ -44,31 +44,24 @@ int main() {
   update2Image.mipmaps = 1;
   update2Image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 
-  jamColor *finalValues = (jamColor *)malloc(LightTextureSize);
-  Image finalImage = {};
-  finalImage.data = update2Values;
-  finalImage.width = LightTextureDim;
-  finalImage.height = LightTextureDim;
-  finalImage.mipmaps = 1;
-  finalImage.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-  
   // this is so we can see the debug light texture in the top left corner.
   for (u32 i = 0; i < LightTextureDim * LightTextureDim; i++) {
     u32 X = i % LightTextureDim;
     u32 Y = i / LightTextureDim;
-    finalValues[Y * LightTextureDim + X] = jamColor{0, 0, 0, 255};
-    update1Values[Y * LightTextureDim + X] = jamColor{0, 0, 0, 255};
-    update2Values[Y * LightTextureDim + X] = jamColor{0, 0, 0, 255};
+    setLightValue(update1Values, LightTextureDim, jamColor{0, 0, 0, 255}, X, Y);
+  // only setting the alpha because the debug light texture needs it.
+    setLightValue(update2Values, LightTextureDim, jamColor{0, 0, 0, 255}, X, Y);
   }
   
-  Texture2D LightTexture = LoadTextureFromImage(finalImage);
+  Texture2D LightTexture = LoadTextureFromImage(update2Image);
+  SetTextureFilter(LightTexture, TEXTURE_FILTER_BILINEAR);
 
   Shader testShader = LoadShader("../shaders/basic.vert", "../shaders/lighting.frag");
   
-  i32 RenderMinimumLoc = GetShaderLocation(testShader, "renderMinimum");
-  i32 RenderMaximumLoc = GetShaderLocation(testShader, "renderMaximum");
+  s32 RenderMinimumLoc = GetShaderLocation(testShader, "renderMinimum");
+  s32 RenderMaximumLoc = GetShaderLocation(testShader, "renderMaximum");
 
-  i32 LightMaploc = GetShaderLocation(testShader, "texture1");
+  s32 LightMaploc = GetShaderLocation(testShader, "texture1");
   f32 LightFallOff = 0.9f;
   
   world global_world = {0};
@@ -81,14 +74,14 @@ int main() {
   for (u32 tileY = 0; tileY < global_world.Height; tileY++) {
     for (u32 tileX = 0; tileX < global_world.Width; tileX++) {
       tile CurrentTile = getTile(global_world, tileX, tileY);
-      CurrentTile.light = 255;
+      CurrentTile.light = packR4G4B4AF(15, 15, 15);
       if (tileY > global_world.Height / 2) {
         if (tileX % 5 == 0) {
           CurrentTile.type = 42;
-          CurrentTile.light = 0;
+          CurrentTile.light = packR4G4B4AF(0, 0, 0);
         } else {
           CurrentTile.type = 43;
-          CurrentTile.light = 0;
+          CurrentTile.light = packR4G4B4AF(0, 0, 0);
         }
 
       }
@@ -119,7 +112,7 @@ int main() {
   u8 entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
   u8 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE, true);
 
-  i8 lightLookat = 0;
+  s8 lightLookat = 0;
 
   f32 Gravity = 9.8;
   f32 OneSecond = 0;
@@ -172,28 +165,15 @@ int main() {
 
     memset(update1Values, 0, LightTextureSize);
     memset(update2Values, 0, LightTextureSize);
-    memset(finalValues, 0, LightTextureSize);
 
     InjectLighting(update1Values, global_world, render_rectangle, LightTextureDim);
-    u32 lightiterCount = 10;
+    u32 lightiterCount = 4;
     for (u32 iter = 0; iter < lightiterCount; iter++) {
       PropagateLighting(update1Values, update2Values, LightTextureDim);
       PropagateLighting(update2Values, update1Values, LightTextureDim);
     }
 
-    FinalLighting(update2Values, finalValues, LightTextureDim);
-
-    switch (lightLookat) {
-      case 0: {
-        UpdateTexture(LightTexture, finalValues);
-      } break;
-      case 1: {
-        UpdateTexture(LightTexture, update2Values);
-      } break;
-      case 2: {
-        UpdateTexture(LightTexture, update1Values);
-      } break;
-    }
+    UpdateTexture(LightTexture, update2Values);
 
     BeginDrawing();
       
@@ -209,7 +189,7 @@ int main() {
               tile CurrentTile = getTile(global_world, tileX, tileY);
               // the tiletype of zero in logic is no tile but the tile sheet of 0 is tile 1 so 
               // subtracting one fixes that bias
-              i32 ActualTileType = CurrentTile.type - 1;
+              s32 ActualTileType = CurrentTile.type - 1;
               if (ActualTileType < 0) {
                 continue;
               }
