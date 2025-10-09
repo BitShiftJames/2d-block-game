@@ -5,6 +5,7 @@
 #include "jamTiles.h"
 #include "jamLighting.h"
 
+#include <iterator>
 #include <string.h>
 
 
@@ -75,20 +76,19 @@ int main() {
     for (u32 tileX = 0; tileX < global_world.Width; tileX++) {
       tile CurrentTile = getTile(global_world, tileX, tileY);
       CurrentTile.light = packR4G4B4AF(15, 15, 15);
-      if (tileY > global_world.Height / 2) {
-        if (tileX % 5 == 0) {
-          CurrentTile.type = 42;
-          CurrentTile.light = packR4G4B4AF(0, 0, 0);
-        } else {
+      if (tileY > global_world.Height /2) {
           CurrentTile.type = 43;
-          CurrentTile.light = packR4G4B4AF(0, 0, 0);
-        }
 
       }
 
 
+
+      if (CurrentTile.type == 43) {
+        CurrentTile.light = packR4G4B4AF(0, 0, 0);
+      }
       if (tileX > global_world.Width - 40) {
         CurrentTile.type = 1;
+          CurrentTile.light = packR4G4B4AF(15, 0, 0);
       }
 
       if (tileX == global_world.Width / 2 && tileY == (global_world.Height / 2) - 3) {
@@ -106,7 +106,7 @@ int main() {
   follow_camera.target = {spawn_location.x, spawn_location.y};
   follow_camera.zoom = 1.0f;
   follow_camera.offset = {(f32)ScreenWidth / 2, (f32)ScreenHeight / 2};
-  
+  b32 follow = true; 
   total_entities global_entities = {};
 
   u8 entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
@@ -127,6 +127,10 @@ int main() {
     if (IsKeyDown(KEY_EQUAL) && follow_camera.zoom < 3.0f) {
       follow_camera.zoom += .05;
     }
+    if (IsKeyPressed(KEY_F1)) {
+      follow = !follow;
+    }
+
 
     if (IsKeyPressed(KEY_COMMA) && lightLookat > 0) {
       lightLookat -= 1;
@@ -136,10 +140,24 @@ int main() {
     }
 
 
-    update_entity_loop(&global_entities, global_world, deltaTime, OneSecond);
-
-    follow_camera.target = {global_entities.entities[entity_id].pos.x, 
+    if (follow) {
+      update_entity_loop(&global_entities, global_world, deltaTime, OneSecond);
+      follow_camera.target = {global_entities.entities[entity_id].pos.x, 
                             global_entities.entities[entity_id].pos.y};
+    } else {
+      if (IsKeyDown(KEY_W)) {
+        follow_camera.target.y -= 5;
+      }
+      if (IsKeyDown(KEY_A)) {
+        follow_camera.target.x -= 5;
+      }
+      if (IsKeyDown(KEY_S)) {
+        follow_camera.target.y += 5;
+      }
+      if (IsKeyDown(KEY_D)) {
+        follow_camera.target.x += 5;
+      }
+    }
 
     v2 render_distance = {256, 256};
     v2 minimum = {floor_f32((global_entities.entities[entity_id].pos.x / global_world.TileSize) - (render_distance.x / 2)), 
@@ -163,17 +181,51 @@ int main() {
     SetShaderValue(testShader, RenderMinimumLoc, RenderMinimum, SHADER_UNIFORM_VEC2);
     SetShaderValue(testShader, RenderMaximumLoc, RenderMaximum, SHADER_UNIFORM_VEC2);
 
-    memset(update1Values, 0, LightTextureSize);
-    memset(update2Values, 0, LightTextureSize);
+    
+    #if 0
+      if (IsKeyPressed(KEY_R)) {
+        memset(update1Values, 0, LightTextureSize);
+        memset(update2Values, 0, LightTextureSize);
+      }
+      if (IsKeyPressed(KEY_I)) {
+        InjectLighting(update1Values, global_world, render_rectangle, LightTextureDim);
+      }
+      if (IsKeyPressed(KEY_Y)) {
+        PropagateLighting(update1Values, update2Values, LightTextureDim);
+      }
+      if (IsKeyPressed(KEY_U)) {
+        PropagateLighting(update2Values, update1Values, LightTextureDim);
+      }
+      
+      if (IsKeyPressed(KEY_COMMA) && lightLookat != 0) {
+        lightLookat = 0;
+      }
 
-    InjectLighting(update1Values, global_world, render_rectangle, LightTextureDim);
-    u32 lightiterCount = 4;
-    for (u32 iter = 0; iter < lightiterCount; iter++) {
-      PropagateLighting(update1Values, update2Values, LightTextureDim);
-      PropagateLighting(update2Values, update1Values, LightTextureDim);
-    }
+      if (IsKeyPressed(KEY_PERIOD) && lightLookat != 1) {
+        lightLookat = 1;
+      }
 
-    UpdateTexture(LightTexture, update2Values);
+      switch (lightLookat) {
+        case (0): {
+          UpdateTexture(LightTexture, update1Values);
+        } break;
+        case (1): {
+          UpdateTexture(LightTexture, update2Values);
+        } break;
+      }
+    #else
+      memset(update1Values, 0, LightTextureSize);
+      memset(update2Values, 0, LightTextureSize);
+
+      u32 lightiterCount = 20;
+      InjectLighting(update1Values, global_world, render_rectangle, LightTextureDim);
+      for (u32 iter = 0; iter < lightiterCount; iter++) {
+        PropagateLighting(update1Values, update2Values, LightTextureDim);
+        PropagateLighting(update2Values, update1Values, LightTextureDim);
+      }
+      UpdateTexture(LightTexture, update2Values);
+    #endif
+  
 
     BeginDrawing();
       
@@ -208,17 +260,31 @@ int main() {
           render_entity_loop(&global_entities);
 
         EndShaderMode();
-        DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, WHITE);
-        DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, RED);
-        DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 40, 40, BLUE);
-        DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 40, 40, PURPLE);
+        #if 0
+          DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, WHITE);
+          DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, RED);
+          DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 40, 40, BLUE);
+          DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 40, 40, PURPLE);
+                 
+          for (u32 X = render_rectangle.Min.x; X <= render_rectangle.Max.x; X += 1) {
+            DrawText(TextFormat("%u", (X - (u32)render_rectangle.Min.x)), (s32)(X * global_world.TileSize), render_rectangle.Min.y * global_world.TileSize, 1, RED);
+            DrawLine(X * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, X * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, BLUE);
+          }
+
+          for (u32 Y = render_rectangle.Min.y; Y <= render_rectangle.Max.y; Y += 1) {
+            DrawText(TextFormat("%u", (Y - (u32)render_rectangle.Min.y)), render_rectangle.Min.x * global_world.TileSize, (s32)(Y * global_world.TileSize) - 8, 1, BLUE);
+            DrawLine(render_rectangle.Min.x * global_world.TileSize, Y * global_world.TileSize, render_rectangle.Max.x * global_world.TileSize, Y * global_world.TileSize, RED);
+          }
+        #endif
+    
 
       EndMode2D();
     // TODO: This should be a debug render function so when I start working on UI I need to do this.   
+    #if 0
       DrawText(TextFormat("Light Texture Look up: %i", lightLookat), 19, 10, 20, WHITE);
       DrawRectangle(17, 37, LightTextureDim + 6, LightTextureDim + 6, WHITE);
       DrawTexture(LightTexture, 20, 40, WHITE);
-
+    #endif
     EndDrawing();
 
     if (OneSecond >= 1.0f) {

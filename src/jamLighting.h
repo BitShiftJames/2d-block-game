@@ -96,18 +96,18 @@ void InjectLighting(jamColor *injectValues, world global_world, jam_rect2 render
 
 void PropagateLighting(jamColor *prevValues, jamColor *nextValues, u32 LightTextureDim) {
   s32 LightFallOff = 15;
-  f32 attenuation = 0.878f; // there is probably a bug in this still because turning the attenuation any lower brings in the band (ing).
+  f32 attenuation = 0.99f; // there is probably a bug in this still because turning the attenuation any lower brings in the band (ing).
 
   for (s32 LightMapY = 0; LightMapY < LightTextureDim; LightMapY++) {
     for (s32 LightMapX = 0; LightMapX < LightTextureDim; LightMapX++) {
       
       jamColor currentLight = prevValues[LightMapY * LightTextureDim + LightMapX];
 
-      jamColor selfLight = nextValues[LightMapY * LightTextureDim + LightMapX];
-      selfLight.r = AddClampColorChannel(selfLight.r, (u8)((f32)currentLight.r * attenuation), 0, 255);
-      selfLight.g = AddClampColorChannel(selfLight.g, (u8)((f32)currentLight.g * attenuation), 0, 255);
-      selfLight.b = AddClampColorChannel(selfLight.b, (u8)((f32)currentLight.b * attenuation), 0, 255);
-      nextValues[LightMapY * LightTextureDim + LightMapX] = selfLight;
+      if (nextValues[LightMapY * LightTextureDim + LightMapX].r == 0 && nextValues[LightMapY * LightTextureDim + LightMapX].g == 0 && nextValues[LightMapY * LightTextureDim + LightMapX].b == 0) {
+        nextValues[LightMapY * LightTextureDim + LightMapX] = prevValues[LightMapY * LightTextureDim + LightMapX];
+      } else {
+        nextValues[LightMapY * LightTextureDim + LightMapX] = nextValues[LightMapY * LightTextureDim + LightMapX];
+      }
 
       for (s32 NeighborMapY = LightMapY - 1; NeighborMapY <= LightMapY + 1; NeighborMapY++) {
       for (s32 NeighborMapX = LightMapX - 1; NeighborMapX <= LightMapX + 1; NeighborMapX++) {
@@ -115,18 +115,19 @@ void PropagateLighting(jamColor *prevValues, jamColor *nextValues, u32 LightText
 
           if (NeighborMapX < LightTextureDim && NeighborMapY < LightTextureDim && NeighborMapX >= 0 && NeighborMapY >= 0) {
             jamColor NeighborLight = prevValues[NeighborMapY * LightTextureDim + NeighborMapX];
+            jamColor nextNeighborLight = nextValues[NeighborMapY * LightTextureDim + NeighborMapX];
 
-            if (NeighborLight.r < currentLight.r && currentLight.r != 0) {
+            if (NeighborLight.r < currentLight.r) {
               u8 B = (u8)(Maximum(0, (s32)currentLight.r - LightFallOff));
               nextValues[NeighborMapY * LightTextureDim + NeighborMapX].r = B;
             }
 
-            if (NeighborLight.g < currentLight.g && currentLight.g != 0) {
+            if (NeighborLight.g < currentLight.g) {
               u8 B = (u8)(Maximum(0, (s32)currentLight.g - LightFallOff));
               nextValues[NeighborMapY * LightTextureDim + NeighborMapX].g = B;
             }
 
-            if (NeighborLight.b < currentLight.b && currentLight.b != 0) {
+            if (NeighborLight.b < currentLight.b) {
               u8 B = (u8)(Maximum(0, (s32)currentLight.b - LightFallOff));
               nextValues[NeighborMapY * LightTextureDim + NeighborMapX].b = B;
             }
@@ -141,7 +142,6 @@ void PropagateLighting(jamColor *prevValues, jamColor *nextValues, u32 LightText
     }
   }
 
-  fflush(stdout);
 }
 
 #endif
