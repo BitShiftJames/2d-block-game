@@ -1,7 +1,11 @@
 #ifndef JAMTYPES_H
 #define JAMTYPES_H
 
+// TODO: Get rid of C standard library? looked through the header and can't read how to actually set these myself.
 #include <stdint.h>
+
+#define jamLIGHTDEBUB_ 0
+#define jamMEMORYHOG_ 1
 
 typedef uint8_t u8;
 typedef uint16_t u16;

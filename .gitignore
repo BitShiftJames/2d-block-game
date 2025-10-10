@@ -6,6 +6,7 @@ src/*.pdb
 src/*.out
 src/*.app
 src/*.dSYM/
+src/jamDebug.h
 
 *.sln
 *.vcxproj

@@ -1,16 +1,18 @@
 #ifndef JAM_MATH_H
 #define JAM_MATH_H
 
-#include <math.h>
 #include "jamTypes.h"
 #include "raylib.h"
+
+// TODO: Get rid of C standard library.
+#include <math.h>
 
 #define Minimum(a, b) ((a) < (b) ? (a) : (b))
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
 #define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
 
 // yes I know I could have made a macro by now but I just don't want to deal with the language specifics for like an hour or two.
-//
+
 f32 jamClamp_f32(f32 x, f32 low, f32 high) {
   return x > high ? high : (x < low ? low : x);
 }
@@ -39,6 +41,16 @@ u16 jamClamp_u16(u16 x, u16 low, u16 high) {
   return x > high ? high : (x < low ? low : x);
 }
 
+#define RAND_MAX 0xFFFFFFFF
+
+#define Rand() ((u32)GetRandomValue(0, RAND_MAX))
+
+// when a world is saved we can get a file Mod time 
+// GetFileModTime(const char *fileName);
+// and use that to set the initial value. For continued precieved randomness we could do something.
+// like periodic take the file mod time and re seed the random function in raylib.
+//SetRandomSeed(unsigned int seed);
+
 struct v2 {
   union {
     struct {
@@ -60,6 +72,11 @@ struct v2 {
 bool operator==(v2 A, v2 B) {
   return A.x == B.x &&
          A.y == B.y;
+}
+
+bool operator!=(v2 A, v2 B) {
+  return A.x != B.x &&
+         A.y != B.y;
 }
 
 v2 operator+(v2 A, v2 B) {
@@ -203,7 +220,7 @@ struct jam_rect2 {
   };
 };
 
-Vector2 JamToRayVec2(v2 A) {
+static inline Vector2 JamToRayVec2(v2 A) {
   Vector2 Result = {};
 
   Result.x = A.x;
@@ -212,7 +229,7 @@ Vector2 JamToRayVec2(v2 A) {
   return Result;
 }
 
-Vector3 JamToRayVec3(v3 A) {
+static inline Vector3 JamToRayVec3(v3 A) {
   Vector3 Result = {};
 
   Result.x = A.x;
@@ -222,7 +239,7 @@ Vector3 JamToRayVec3(v3 A) {
   return Result;
 }
 
-Vector4 JamToRayVec4(v4 A) {
+static inline Vector4 JamToRayVec4(v4 A) {
   Vector4 Result = {};
 
   Result.x = A.x;
@@ -233,7 +250,7 @@ Vector4 JamToRayVec4(v4 A) {
   return Result;
 }
 
-Rectangle JamToRayRect(jam_rect2 A) {
+static inline Rectangle JamToRayRect(jam_rect2 A) {
   Rectangle Result = {};
 
   Result.x = A.x;
@@ -244,7 +261,7 @@ Rectangle JamToRayRect(jam_rect2 A) {
   return Result;
 }
 
-jam_rect2 JamRectMinDim(v2 Min, v2 Dim) {
+static inline jam_rect2 JamRectMinDim(v2 Min, v2 Dim) {
   jam_rect2 Result = {};
 
   Result.x = Min.x;
@@ -255,7 +272,7 @@ jam_rect2 JamRectMinDim(v2 Min, v2 Dim) {
   return Result;
 }
 
-jam_rect2 JamRectMinDim(v2 Min, f32 Dim) {
+static inline jam_rect2 JamRectMinDim(v2 Min, f32 Dim) {
   jam_rect2 Result = {};
 
   Result.x = Min.x;
@@ -266,7 +283,7 @@ jam_rect2 JamRectMinDim(v2 Min, f32 Dim) {
   return Result;
 }
 
-jam_rect2 JamRectMinMax(v2 Min, v2 Max) {
+static inline jam_rect2 JamRectMinMax(v2 Min, v2 Max) {
   jam_rect2 Result = {};
 
   Result.x = Min.x;
@@ -277,31 +294,31 @@ jam_rect2 JamRectMinMax(v2 Min, v2 Max) {
   return Result;
 }
 
-f32 floor_f32(f32 value) {
+static inline f32 floor_f32(f32 value) {
   f32 result = floorf(value);
 
   return result;
 }
 
-f32 SquareRoot(f32 value) {
+static inline f32 SquareRoot(f32 value) {
   f32 Result = sqrtf(value);
 
   return Result;
 }
 
-f32 Inner(v2 A, v2 B) {
+static inline f32 Inner(v2 A, v2 B) {
   f32 Result = A.x * B.x + A.y * B.y;
 
   return Result;
 }
 
-f32 LengthSq(v2 A) {
+static inline f32 LengthSq(v2 A) {
   f32 Result = Inner(A, A);
   
   return Result;
 }
 
-f32 Length(v2 A) {
+static inline f32 Length(v2 A) {
   f32 Result = SquareRoot(LengthSq(A));
 
   return Result;

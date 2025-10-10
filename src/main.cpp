@@ -1,3 +1,13 @@
+#if 1
+// a profiler from Handmade hero (Day 176-179)
+// disabled for now pending permission to be included in source code in public repository.
+// Code is currently for private development only and will not be included in release builds.
+// until permission is granted. o7.
+#include "jamDebug.h"
+#else
+#define TIMED_BLOCK 0
+#endif
+
 #include "raylib.h"
 #include "jamTypes.h"
 #include "jamMath.h"
@@ -5,9 +15,22 @@
 #include "jamTiles.h"
 #include "jamLighting.h"
 
-#include <iterator>
 #include <string.h>
 
+//
+// TODO: Write an LSP and treesitter because the current ones 
+// for C and C++ have horrible configuration steps for neovim.
+//
+// Systems that need to be done.
+//
+// [] Profiling
+// [] UI for both Utility and Gameplay
+// [] Commands to give Items
+// [] State management for being in the title screen, playing, pause menu.
+// [] Day night cycle, lighting color needs to be changed accordingly.
+// [] Better asset handling. 
+//
+//
 
 int main() {
   u32 flags = FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT;// FLAG_WINDOW_TOPMOST | FLAG_WINDOW_UNDECORATED;
@@ -29,7 +52,7 @@ int main() {
   u32 LightTextureDim = 256;
   u32 LightTextureSize = LightTextureDim * LightTextureDim * sizeof(jamColor);
 
-  jamColor *update1Values = (jamColor *)malloc(LightTextureSize);
+  jamColor *update1Values = (jamColor *)MemAlloc(LightTextureSize);
   Image update1Image = {};
   update1Image.data = update1Values;
   update1Image.width = LightTextureDim;
@@ -37,7 +60,7 @@ int main() {
   update1Image.mipmaps = 1;
   update1Image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 
-  jamColor *update2Values = (jamColor *)malloc(LightTextureSize);
+  jamColor *update2Values = (jamColor *)MemAlloc(LightTextureSize);
   Image update2Image = {};
   update2Image.data = update2Values;
   update2Image.width = LightTextureDim;
@@ -75,17 +98,19 @@ int main() {
   for (u32 tileY = 0; tileY < global_world.Height; tileY++) {
     for (u32 tileX = 0; tileX < global_world.Width; tileX++) {
       tile CurrentTile = getTile(global_world, tileX, tileY);
-      CurrentTile.light = packR4G4B4AF(15, 15, 15);
       if (tileY > global_world.Height /2) {
-          CurrentTile.type = 43;
-
+          if (tileX > (global_world.Width / 2) && tileX < (global_world.Width / 2) + 40) {
+          } else {
+            CurrentTile.type = 43;
+          }
+          CurrentTile.light = packR4G4B4AF(0, 0, 0);
+      } else {
       }
 
-
-
-      if (CurrentTile.type == 43) {
-        CurrentTile.light = packR4G4B4AF(0, 0, 0);
+      if (CurrentTile.type == 0) {
+        CurrentTile.light = packR4G4B4AF(15, 15, 15);
       }
+
       if (tileX > global_world.Width - 40) {
         CurrentTile.type = 1;
           CurrentTile.light = packR4G4B4AF(15, 0, 0);
@@ -99,7 +124,6 @@ int main() {
       global_world.map[tileY * global_world.Width + tileX] = CurrentTile;
     }
   }
-
 
 
   Camera2D follow_camera = {};
@@ -141,6 +165,7 @@ int main() {
 
 
     if (follow) {
+      TIMED_BLOCK;
       update_entity_loop(&global_entities, global_world, deltaTime, OneSecond);
       follow_camera.target = {global_entities.entities[entity_id].pos.x, 
                             global_entities.entities[entity_id].pos.y};
@@ -182,7 +207,7 @@ int main() {
     SetShaderValue(testShader, RenderMaximumLoc, RenderMaximum, SHADER_UNIFORM_VEC2);
 
     
-    #if 0
+    #if jamLIGHTDEBUB_
       if (IsKeyPressed(KEY_R)) {
         memset(update1Values, 0, LightTextureSize);
         memset(update2Values, 0, LightTextureSize);
@@ -217,9 +242,10 @@ int main() {
       memset(update1Values, 0, LightTextureSize);
       memset(update2Values, 0, LightTextureSize);
 
-      u32 lightiterCount = 20;
-      InjectLighting(update1Values, global_world, render_rectangle, LightTextureDim);
+      u32 lightiterCount = 2;
+      InjectLighting(update1Values, global_world, global_entities, render_rectangle, LightTextureDim);
       for (u32 iter = 0; iter < lightiterCount; iter++) {
+        TIMED_BLOCK;
         PropagateLighting(update1Values, update2Values, LightTextureDim);
         PropagateLighting(update2Values, update1Values, LightTextureDim);
       }
@@ -256,11 +282,11 @@ int main() {
                              Vector2{(f32)(tileX * global_world.TileSize), (f32)(tileY * global_world.TileSize)}, WHITE);
             }
           }
-          
+
           render_entity_loop(&global_entities);
 
         EndShaderMode();
-        #if 0
+        #if jamLIGHTDEBUB_
           DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, WHITE);
           DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, RED);
           DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 40, 40, BLUE);
@@ -285,7 +311,9 @@ int main() {
       DrawRectangle(17, 37, LightTextureDim + 6, LightTextureDim + 6, WHITE);
       DrawTexture(LightTexture, 20, 40, WHITE);
     #endif
+
     EndDrawing();
+
 
     if (OneSecond >= 1.0f) {
       OneSecond = 0;
@@ -294,6 +322,8 @@ int main() {
   }
 
   CloseWindow();
-
   return 0;
 }
+
+debugRecords MainDebugRecords[__COUNTER__];
+

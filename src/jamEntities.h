@@ -4,12 +4,19 @@
 #include "jamTypes.h"
 #include "jamMath.h"
 #include "jamTiles.h"
+#include "jamDebug.h"
 #include "raylib.h"
-#include "math.h"
-#include <cstdlib>
+
+//
+// [] Entities should use a hash, for total loops use an index list.
+// [] ECS system to have sparse entity components.
+// [] Bosses
+// [] More behaviors + Smarter behaviors
+// [] Contribute to tile lighting. In some way that doesn't double store static light and dynamic light.
+//
 
 enum entity_states {
-
+  INVALID,
   IGNORE,
   IDLE,
   WONDER,
@@ -18,7 +25,6 @@ enum entity_states {
 };
 
 struct entity {
-
   u32 state;
   v2 pos;
   v2 velocity;
@@ -28,14 +34,15 @@ struct entity {
   b32 debug_render; // this is a boolean later on it will probably be collapsed into flags.
 };
 
+#define MAX_ENTITIES 256
 struct total_entities {
-
   u8 entity_count;
-  entity entities[256];
+  // need someway to do an entity that chases another entity.
+  // that isn't O(n^2)
+  entity entities[MAX_ENTITIES];
 };
 
-b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
-
+static inline b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
   b32 left = A.Max.x < B.x;
   b32 right = A.x > B.Max.x;
   b32 bottom = A.Max.y < B.y;
@@ -47,8 +54,7 @@ b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
            top);
 }
 
-jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
-
+static jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
   jam_rect2 Result = {};
   
   Result.x = B.x - A.Max.x;
@@ -59,8 +65,7 @@ jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
   return Result;
 }
 
-jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
-
+static jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
     u32 MinTileX = (floor_f32(A.Min.x)) / global_world.TileSize;
     u32 MinTileY = (floor_f32(A.Min.y)) / global_world.TileSize;
     u32 MaxTileX = (floor_f32(A.Max.x)) / global_world.TileSize;
@@ -97,8 +102,7 @@ jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
   return TileRect;
 }
 
-u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State, b32 debug_state) {
-
+static u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State, b32 debug_state) {
   u8 entity_id;
   if (global_entities->entity_count < ArrayCount(global_entities->entities) - 1) {
     global_entities->entities[global_entities->entity_count].dim = dim;
@@ -112,13 +116,12 @@ u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states Sta
   return entity_id;
 }
 
-v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {
-
+static v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {
   v2 Result = {};
-  // raycast or some check to see if there is something below the player.
+  // grounded block check.
   f32 padding = 1;
   f32 drag_coefficent = 2.0f;
-  jam_rect2 ground_box = JamRectMinDim(v2{Entity->pos.x + padding, Entity->pos.y + (Entity->dim.y - padding)}, v2{Entity->dim.x - (padding * 2), 4});
+  jam_rect2 ground_box = JamRectMinDim(v2{Entity->pos.x + padding, Entity->pos.y + (Entity->dim.y - padding)}, v2{Entity->dim.x - (padding * 2), 1.2});
   jam_rect2 tile_box = collision_rect_construction(ground_box, global_world);
   if (!AABBcollisioncheck(ground_box, tile_box)) {
     Entity->acceleration.y += global_world.gravity_constant;
@@ -129,8 +132,7 @@ v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {
   return Result;
 }
 
-void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_movement, f32 deltaTime) {
-
+static void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_movement, f32 deltaTime) {
     v2 new_entity_position = Entity->pos + delta_movement;
 
     v2 Min = {Minimum(Entity->pos.x, new_entity_position.x), 
@@ -194,8 +196,7 @@ void collision_resolution_for_move(entity *Entity, world global_world, v2 delta_
     Entity->velocity += Entity->acceleration * deltaTime;
 }
 
-void entity_wonder(entity *Entity) {
-
+static void entity_wonder(entity *Entity) {
     if (Entity->stateTime <= 0) {
       Entity->stateTime = 10;
       Entity->state = IDLE;
@@ -209,19 +210,17 @@ void entity_wonder(entity *Entity) {
     }
 }
 
-void entity_idle(entity *Entity) {
-
+static void entity_idle(entity *Entity) {
     if (Entity->stateTime <= 0) {
       Entity->stateTime = 5;
       Entity->state = WONDER;
-      f32 direction = (abs(rand()) > (RAND_MAX / 2) ? -1.0 : 1.0);
+      f32 direction = (Rand() > (RAND_MAX / 2)) ? -1.0f : 1.0f;
       f32 speed = 200;
       Entity->acceleration = v2{direction * speed, 0};
     } 
 }
 
-void entity_ignore(entity *Entity, f32 inputStrength) {
-
+static void entity_ignore(entity *Entity, f32 inputStrength) {
     if (IsKeyDown(KEY_W)) {
       Entity->acceleration.y--;
     }
@@ -248,7 +247,7 @@ void entity_ignore(entity *Entity, f32 inputStrength) {
 //   2. Generate a delta movement
 //   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
 //   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
-void update_entity_loop(total_entities *global_entities, world global_world, f32 deltaTime, f32 OneSecond) {
+static void update_entity_loop(total_entities *global_entities, world global_world, f32 deltaTime, f32 OneSecond) {
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];
     f32 inputStrength = 250.0f;
@@ -281,14 +280,14 @@ void update_entity_loop(total_entities *global_entities, world global_world, f32
 
     collision_resolution_for_move(&global_entities->entities[entity_index], global_world, 
                                   entity_movement_delta, deltaTime);
+
   }
 
 }
-void render_entity_loop(total_entities *global_entities) {
-
+static void render_entity_loop(total_entities *global_entities) {
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];
-    
+    TIMED_BLOCK;
     switch (currentEntity.state) {
       case IGNORE: {
         DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 

@@ -1,11 +1,19 @@
 #ifndef JAM_LIGHTING_H
 #define JAM_LIGHTING_H
 
+#include "jamEntities.h"
 #include "jamTypes.h"
 #include "jamTiles.h"
 #include "jamMath.h"
+#include "jamDebug.h"
 #include "stdio.h"
-#include <cstdio>
+
+//
+// [] Move this to entirely GPU.
+// [] CPU <--> GPU toggle.
+// [] Optimize CPU Lighting using SIMD if possible
+// [] If optimization goes well get it up to 16 iterations so that light is just solved on both GPU and CPU.
+//
 
 typedef struct jamColor {
   u8 r;
@@ -22,7 +30,7 @@ typedef struct unpackedR4G4B4A4 {
 } unpackedR4G4B4A4;
 
 // Alpha is default to max.
-u16 packR4G4B4AF(u16 r, u16 g, u16 b) {
+static inline u16 packR4G4B4AF(u16 r, u16 g, u16 b) {
   u16 Result = (jamClamp_u16(r, 0, 15) << 12) | 
                (jamClamp_u16(g, 0, 15) << 8) | 
                (jamClamp_u16(b, 0, 15) << 4) | 15; 
@@ -30,7 +38,7 @@ u16 packR4G4B4AF(u16 r, u16 g, u16 b) {
   return Result;
 }
 
-u16 packR4G4B4A4(u16 r, u16 g, u16 b, u16 a) {
+static inline u16 packR4G4B4A4(u16 r, u16 g, u16 b, u16 a) {
   u16 Result = (jamClamp_u16(r, 0, 15) << 12) | 
                (jamClamp_u16(g, 0, 15) << 8) | 
                (jamClamp_u16(b, 0, 15) << 4) |
@@ -39,7 +47,7 @@ u16 packR4G4B4A4(u16 r, u16 g, u16 b, u16 a) {
   return Result;
 }
 
-unpackedR4G4B4A4 unpackR4G4B4A4(u16 color) {
+static inline unpackedR4G4B4A4 unpackR4G4B4A4(u16 color) {
   unpackedR4G4B4A4 Result = {};
   
   Result.r = (color >> 12) & 0xF;
@@ -50,7 +58,7 @@ unpackedR4G4B4A4 unpackR4G4B4A4(u16 color) {
   return Result; 
 }
 
-jamColor AddClampColor(jamColor A, jamColor B, u16 low, u16 high) {
+static inline jamColor AddClampColor(jamColor A, jamColor B, u16 low, u16 high) {
   jamColor Result = {};
 
   Result.r = (u8)jamClamp_u16(((u16)A.r + (u16)B.r), low, high);
@@ -61,7 +69,7 @@ jamColor AddClampColor(jamColor A, jamColor B, u16 low, u16 high) {
   return Result;
 }
 
-u8 AddClampColorChannel(u8 A, u8 B, u8 low, u8 high) {
+static inline u8 AddClampColorChannel(u8 A, u8 B, u8 low, u8 high) {
   u8 Result = 0;
 
   Result = (u8)jamClamp_u16(((u16)A + (u16)B), (u16)low, (u16)high);
@@ -69,13 +77,13 @@ u8 AddClampColorChannel(u8 A, u8 B, u8 low, u8 high) {
   return Result;
 }
 
-void setLightValue(jamColor *imageValues, u32 LightTextureDim, jamColor A, u8 X, u8 Y) {
+static inline void setLightValue(jamColor *imageValues, u32 LightTextureDim, jamColor A, u8 X, u8 Y) {
   // only setting the alpha because the debug light texture needs it.
   imageValues[Y * LightTextureDim + X] = jamColor{A.r, A.g, A.b, 255};
 }
 
-void InjectLighting(jamColor *injectValues, world global_world, jam_rect2 render_rectangle, u32 LightTextureDim) {
-
+static void InjectLighting(jamColor *injectValues, world global_world, total_entities global_entities, jam_rect2 render_rectangle, u32 LightTextureDim) {
+  TIMED_BLOCK;
   for (u32 LightMapY = 0; LightMapY < LightTextureDim; LightMapY++) {
     for (u32 LightMapX = 0; LightMapX < LightTextureDim; LightMapX++) {
       u32 TileLightX = render_rectangle.Min.x + LightMapX;
@@ -84,19 +92,19 @@ void InjectLighting(jamColor *injectValues, world global_world, jam_rect2 render
       if (TileLightX > global_world.Width || TileLightY > global_world.Height) { continue; }
       
       tile currentTile = getTile(global_world, TileLightX, TileLightY);
-
+      
       unpackedR4G4B4A4 color = unpackR4G4B4A4(currentTile.light);
-      jamColor fullColor = {(u8)(((f32)color.r / 15.0f) * 255), (u8)(((f32)color.g / 15.0f) * 255), (u8)(((f32)color.b / 15.0f) * 255), 255};
+      jamColor ColorNormalized = {(u8)(((f32)color.r / 15.0f) * 255), (u8)(((f32)color.g / 15.0f) * 255), (u8)(((f32)color.b / 15.0f) * 255), 255};
+
       setLightValue(injectValues, LightTextureDim, 
-                    fullColor, LightMapX, LightMapY);
+                    ColorNormalized, LightMapX, LightMapY);
 
     }
   }
 }
 
-void PropagateLighting(jamColor *prevValues, jamColor *nextValues, u32 LightTextureDim) {
+static void PropagateLighting(jamColor *prevValues, jamColor *nextValues, u32 LightTextureDim) {
   s32 LightFallOff = 15;
-  f32 attenuation = 0.99f; // there is probably a bug in this still because turning the attenuation any lower brings in the band (ing).
 
   for (s32 LightMapY = 0; LightMapY < LightTextureDim; LightMapY++) {
     for (s32 LightMapX = 0; LightMapX < LightTextureDim; LightMapX++) {
