@@ -7,6 +7,7 @@ src/*.out
 src/*.app
 src/*.dSYM/
 src/jamDebug.h
+src/jamDebug.cpp
 
 *.sln
 *.vcxproj

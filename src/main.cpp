@@ -1,19 +1,21 @@
-#if 1
-// a profiler from Handmade hero (Day 176-179)
-// disabled for now pending permission to be included in source code in public repository.
-// Code is currently for private development only and will not be included in release builds.
-// until permission is granted. o7.
+#define PERMISSION 0
+#if PERMISSION
+// a profiler from Handmade hero (Day 176-179). 
+// I got permission but I probably won't include it in the code still.
 #include "jamDebug.h"
 #else
-#define TIMED_BLOCK 0
+#define TIMED_BLOCK __noop
 #endif
 
 #include "raylib.h"
+
 #include "jamTypes.h"
 #include "jamMath.h"
 #include "jamEntities.h"
 #include "jamTiles.h"
 #include "jamLighting.h"
+
+#include "jamUI.h"
 
 #include <string.h>
 
@@ -23,13 +25,12 @@
 //
 // Systems that need to be done.
 //
-// [] Profiling
+// [X] Profiling
 // [] UI for both Utility and Gameplay
 // [] Commands to give Items
 // [] State management for being in the title screen, playing, pause menu.
 // [] Day night cycle, lighting color needs to be changed accordingly.
 // [] Better asset handling. 
-//
 //
 
 int main() {
@@ -40,8 +41,7 @@ int main() {
   s32 ScreenWidth = GetScreenWidth();
   s32 ScreenHeight = GetScreenHeight();
   SetTraceLogLevel(LOG_ALL);
-  SetTargetFPS(60);
-  
+  HideCursor();
 //  Image bubbleTest = LoadImage("../assets/bubbles.png");
 //  Texture2D bubbleTexture = LoadTextureFromImage(bubbleTest);
 //  UnloadImage(bubbleTest);
@@ -87,7 +87,9 @@ int main() {
 
   s32 LightMaploc = GetShaderLocation(testShader, "texture1");
   f32 LightFallOff = 0.9f;
-  
+  UI_ASSETS global_ui_style = {};
+  InitUI(&global_ui_style);
+
   world global_world = {0};
   global_world.Width = 500;
   global_world.Height = 300;
@@ -136,12 +138,14 @@ int main() {
   u8 entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
   u8 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE, true);
 
-  s8 lightLookat = 0;
+  b32 profilerToggle = false;
+  b32 playerUIToggle = true;
 
   f32 Gravity = 9.8;
   f32 OneSecond = 0;
   b32 OneOrTwo = 0;
   while (!WindowShouldClose()) {
+
     f32 deltaTime = GetFrameTime();
     OneSecond += deltaTime;
 
@@ -151,21 +155,29 @@ int main() {
     if (IsKeyDown(KEY_EQUAL) && follow_camera.zoom < 3.0f) {
       follow_camera.zoom += .05;
     }
+
     if (IsKeyPressed(KEY_F1)) {
       follow = !follow;
     }
 
-
-    if (IsKeyPressed(KEY_COMMA) && lightLookat > 0) {
-      lightLookat -= 1;
+    if (IsKeyPressed(KEY_F2)) {
+      profilerToggle = !profilerToggle;
     }
-    if (IsKeyPressed(KEY_PERIOD) && lightLookat < 2) {
-      lightLookat += 1;
+    if (IsKeyPressed(KEY_F3)) {
+      playerUIToggle = !playerUIToggle;
+    }
+
+    if (IsKeyPressed(KEY_TAB)) {
+      if (global_ui_style.Playerinventory.DisplaySlots != 8) {
+        global_ui_style.Playerinventory.DisplaySlots = 8;
+      } else {
+        global_ui_style.Playerinventory.DisplaySlots = 40;
+      }
+      
     }
 
 
     if (follow) {
-      TIMED_BLOCK;
       update_entity_loop(&global_entities, global_world, deltaTime, OneSecond);
       follow_camera.target = {global_entities.entities[entity_id].pos.x, 
                             global_entities.entities[entity_id].pos.y};
@@ -241,11 +253,10 @@ int main() {
     #else
       memset(update1Values, 0, LightTextureSize);
       memset(update2Values, 0, LightTextureSize);
-
+      
       u32 lightiterCount = 2;
       InjectLighting(update1Values, global_world, global_entities, render_rectangle, LightTextureDim);
       for (u32 iter = 0; iter < lightiterCount; iter++) {
-        TIMED_BLOCK;
         PropagateLighting(update1Values, update2Values, LightTextureDim);
         PropagateLighting(update2Values, update1Values, LightTextureDim);
       }
@@ -286,7 +297,7 @@ int main() {
           render_entity_loop(&global_entities);
 
         EndShaderMode();
-        #if jamLIGHTDEBUB_
+        #if 0
           DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, WHITE);
           DrawRectangle(render_rectangle.Max.x * global_world.TileSize, render_rectangle.Min.y * global_world.TileSize, 40, 40, RED);
           DrawRectangle(render_rectangle.Min.x * global_world.TileSize, render_rectangle.Max.y * global_world.TileSize, 40, 40, BLUE);
@@ -305,13 +316,18 @@ int main() {
     
 
       EndMode2D();
-    // TODO: This should be a debug render function so when I start working on UI I need to do this.   
+      
+      DrawUI(&global_ui_style, profilerToggle, playerUIToggle);
+    // TODO: Put this in the DebugUI.
+    
     #if 0
       DrawText(TextFormat("Light Texture Look up: %i", lightLookat), 19, 10, 20, WHITE);
       DrawRectangle(17, 37, LightTextureDim + 6, LightTextureDim + 6, WHITE);
       DrawTexture(LightTexture, 20, 40, WHITE);
     #endif
-
+    #if PERMISSION
+      Draw_Counter();
+    #endif
     EndDrawing();
 
 
@@ -325,5 +341,7 @@ int main() {
   return 0;
 }
 
-debugRecords MainDebugRecords[__COUNTER__];
-
+#if PERMISSION
+  debugRecords MainDebugRecords[__COUNTER__];
+  #include "jamDebug.cpp"
+#endif

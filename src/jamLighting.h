@@ -5,14 +5,13 @@
 #include "jamTypes.h"
 #include "jamTiles.h"
 #include "jamMath.h"
-#include "jamDebug.h"
 #include "stdio.h"
 
 //
 // [] Move this to entirely GPU.
 // [] CPU <--> GPU toggle.
-// [] Optimize CPU Lighting using SIMD if possible
-// [] If optimization goes well get it up to 16 iterations so that light is just solved on both GPU and CPU.
+// [-] Optimize CPU Lighting using SIMD if possible. <--- Might be possible but with the current lay out it would be very hard to vectorize and use SIMD on.
+// [-] If optimization goes well get it up to 16 iterations.
 //
 
 typedef struct jamColor {
@@ -29,6 +28,24 @@ typedef struct unpackedR4G4B4A4 {
   s32 a;
 } unpackedR4G4B4A4;
 
+u8 u16Valuestou32Values[16] = {
+  0,
+  17,
+  34,
+  51,
+  68,
+  85,
+  102,
+  119,
+  136,
+  153,
+  170,
+  187,
+  204,
+  221, 
+  238,
+  255,
+};
 // Alpha is default to max.
 static inline u16 packR4G4B4AF(u16 r, u16 g, u16 b) {
   u16 Result = (jamClamp_u16(r, 0, 15) << 12) | 
@@ -83,64 +100,68 @@ static inline void setLightValue(jamColor *imageValues, u32 LightTextureDim, jam
 }
 
 static void InjectLighting(jamColor *injectValues, world global_world, total_entities global_entities, jam_rect2 render_rectangle, u32 LightTextureDim) {
-  TIMED_BLOCK;
+  TIMED_BLOCK();
   for (u32 LightMapY = 0; LightMapY < LightTextureDim; LightMapY++) {
     for (u32 LightMapX = 0; LightMapX < LightTextureDim; LightMapX++) {
-      u32 TileLightX = render_rectangle.Min.x + LightMapX;
-      u32 TileLightY = render_rectangle.Min.y + LightMapY;
+      TIMED_BLOCK();
+      u32 TileLightX = (u32)render_rectangle.Min.x + LightMapX;
+      u32 TileLightY = (u32)render_rectangle.Min.y + LightMapY;
 
-      if (TileLightX > global_world.Width || TileLightY > global_world.Height) { continue; }
+      if ((TileLightX >= global_world.Width || TileLightY >= global_world.Height)) { continue; }
       
-      tile currentTile = getTile(global_world, TileLightX, TileLightY);
+      tile currentTile = global_world.map[TileLightY * global_world.Width + TileLightX];
       
-      unpackedR4G4B4A4 color = unpackR4G4B4A4(currentTile.light);
-      jamColor ColorNormalized = {(u8)(((f32)color.r / 15.0f) * 255), (u8)(((f32)color.g / 15.0f) * 255), (u8)(((f32)color.b / 15.0f) * 255), 255};
+      u8 colorR = (currentTile.light >> 12) & 0xF;
+      u8 colorB = (currentTile.light >> 8) & 0xF;
+      u8 colorG = (currentTile.light >> 4) & 0xF;
+      u8 colorA = (currentTile.light >> 0) & 0xF;
 
-      setLightValue(injectValues, LightTextureDim, 
-                    ColorNormalized, LightMapX, LightMapY);
+      injectValues[LightMapY * LightTextureDim + LightMapX] = jamColor{u16Valuestou32Values[colorR], u16Valuestou32Values[colorG], u16Valuestou32Values[colorB], u16Valuestou32Values[colorA]};
 
     }
   }
 }
 
 static void PropagateLighting(jamColor *prevValues, jamColor *nextValues, u32 LightTextureDim) {
+  TIMED_BLOCK();
   s32 LightFallOff = 15;
 
   for (s32 LightMapY = 0; LightMapY < LightTextureDim; LightMapY++) {
     for (s32 LightMapX = 0; LightMapX < LightTextureDim; LightMapX++) {
-      
-      jamColor currentLight = prevValues[LightMapY * LightTextureDim + LightMapX];
+      TIMED_BLOCK();
+      u32 middleIndex = LightMapY * LightTextureDim + LightMapX;
+      jamColor currentLight = prevValues[middleIndex];
 
-      if (nextValues[LightMapY * LightTextureDim + LightMapX].r == 0 && nextValues[LightMapY * LightTextureDim + LightMapX].g == 0 && nextValues[LightMapY * LightTextureDim + LightMapX].b == 0) {
-        nextValues[LightMapY * LightTextureDim + LightMapX] = prevValues[LightMapY * LightTextureDim + LightMapX];
+      if (nextValues[middleIndex].r == 0 && nextValues[middleIndex].g == 0 && nextValues[middleIndex].b == 0) {
+        nextValues[middleIndex] = prevValues[middleIndex];
       } else {
-        nextValues[LightMapY * LightTextureDim + LightMapX] = nextValues[LightMapY * LightTextureDim + LightMapX];
+        nextValues[middleIndex] = nextValues[middleIndex];
       }
-
+      
       for (s32 NeighborMapY = LightMapY - 1; NeighborMapY <= LightMapY + 1; NeighborMapY++) {
       for (s32 NeighborMapX = LightMapX - 1; NeighborMapX <= LightMapX + 1; NeighborMapX++) {
           if (NeighborMapX == LightMapX && NeighborMapY == LightMapY) { continue; } // We skip over this value in the loop because it's simpler to think that we already set the current value.
-
+          u32 nearIndex = NeighborMapY * LightTextureDim + NeighborMapX;
           if (NeighborMapX < LightTextureDim && NeighborMapY < LightTextureDim && NeighborMapX >= 0 && NeighborMapY >= 0) {
-            jamColor NeighborLight = prevValues[NeighborMapY * LightTextureDim + NeighborMapX];
-            jamColor nextNeighborLight = nextValues[NeighborMapY * LightTextureDim + NeighborMapX];
+            jamColor NeighborLight = prevValues[nearIndex];
+            jamColor& nextNeighborLight = nextValues[nearIndex];
 
             if (NeighborLight.r < currentLight.r) {
-              u8 B = (u8)(Maximum(0, (s32)currentLight.r - LightFallOff));
-              nextValues[NeighborMapY * LightTextureDim + NeighborMapX].r = B;
+              u8 A = (u8)(Maximum(0, (s32)currentLight.r - LightFallOff));
+              nextValues[nearIndex].r = A;
             }
 
             if (NeighborLight.g < currentLight.g) {
               u8 B = (u8)(Maximum(0, (s32)currentLight.g - LightFallOff));
-              nextValues[NeighborMapY * LightTextureDim + NeighborMapX].g = B;
+              nextValues[nearIndex].g = B;
             }
 
             if (NeighborLight.b < currentLight.b) {
-              u8 B = (u8)(Maximum(0, (s32)currentLight.b - LightFallOff));
-              nextValues[NeighborMapY * LightTextureDim + NeighborMapX].b = B;
+              u8 C = (u8)(Maximum(0, (s32)currentLight.b - LightFallOff));
+              nextValues[nearIndex].b = C;
             }
 
-            nextValues[NeighborMapY * LightTextureDim + NeighborMapX].a = 255;
+            nextValues[nearIndex].a = 255;
             
           } 
 

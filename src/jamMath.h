@@ -7,9 +7,6 @@
 // TODO: Get rid of C standard library.
 #include <math.h>
 
-#define Minimum(a, b) ((a) < (b) ? (a) : (b))
-#define Maximum(a, b) ((a) > (b) ? (a) : (b))
-#define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
 
 // yes I know I could have made a macro by now but I just don't want to deal with the language specifics for like an hour or two.
 
@@ -41,9 +38,9 @@ u16 jamClamp_u16(u16 x, u16 low, u16 high) {
   return x > high ? high : (x < low ? low : x);
 }
 
-#define RAND_MAX 0xFFFFFFFF
+#define JAMRAND_MAX 0xFFFFFFFF
 
-#define Rand() ((u32)GetRandomValue(0, RAND_MAX))
+#define Rand() ((u32)GetRandomValue(0, JAMRAND_MAX))
 
 // when a world is saved we can get a file Mod time 
 // GetFileModTime(const char *fileName);

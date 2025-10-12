@@ -4,6 +4,10 @@
 // TODO: Get rid of C standard library? looked through the header and can't read how to actually set these myself.
 #include <stdint.h>
 
+#define Minimum(a, b) ((a) < (b) ? (a) : (b))
+#define Maximum(a, b) ((a) > (b) ? (a) : (b))
+#define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
+
 #define jamLIGHTDEBUB_ 0
 #define jamMEMORYHOG_ 1
 

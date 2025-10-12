@@ -4,7 +4,6 @@
 #include "jamTypes.h"
 #include "jamMath.h"
 #include "jamTiles.h"
-#include "jamDebug.h"
 #include "raylib.h"
 
 //
@@ -214,7 +213,7 @@ static void entity_idle(entity *Entity) {
     if (Entity->stateTime <= 0) {
       Entity->stateTime = 5;
       Entity->state = WONDER;
-      f32 direction = (Rand() > (RAND_MAX / 2)) ? -1.0f : 1.0f;
+      f32 direction = (Rand() > (JAMRAND_MAX / 2)) ? -1.0f : 1.0f;
       f32 speed = 200;
       Entity->acceleration = v2{direction * speed, 0};
     } 
@@ -287,7 +286,6 @@ static void update_entity_loop(total_entities *global_entities, world global_wor
 static void render_entity_loop(total_entities *global_entities) {
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];
-    TIMED_BLOCK;
     switch (currentEntity.state) {
       case IGNORE: {
         DrawRectangleV(Vector2{currentEntity.pos.x, currentEntity.pos.y}, 
