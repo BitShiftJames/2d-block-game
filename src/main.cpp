@@ -1,4 +1,4 @@
-#define PERMISSION 0
+#define PERMISSION 1
 #if PERMISSION
 // a profiler from Handmade hero (Day 176-179). 
 // I got permission but I probably won't include it in the code still.
@@ -81,7 +81,10 @@ int main() {
   SetTextureFilter(LightTexture, TEXTURE_FILTER_BILINEAR);
 
   Shader testShader = LoadShader("../shaders/basic.vert", "../shaders/lighting.frag");
-  
+
+  // TODO: Handle screen resize calls.
+  RenderTexture2D UI_texture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+
   s32 RenderMinimumLoc = GetShaderLocation(testShader, "renderMinimum");
   s32 RenderMaximumLoc = GetShaderLocation(testShader, "renderMaximum");
 
@@ -170,8 +173,10 @@ int main() {
     if (IsKeyPressed(KEY_TAB)) {
       if (global_ui_style.Playerinventory.DisplaySlots != 8) {
         global_ui_style.Playerinventory.DisplaySlots = 8;
+        global_ui_style.Dirty = true;       
       } else {
         global_ui_style.Playerinventory.DisplaySlots = 40;
+        global_ui_style.Dirty = true;       
       }
       
     }
@@ -317,7 +322,7 @@ int main() {
 
       EndMode2D();
       
-      DrawUI(&global_ui_style, profilerToggle, playerUIToggle);
+      DrawUI(&global_ui_style, UI_texture, profilerToggle, playerUIToggle);
     // TODO: Put this in the DebugUI.
     
     #if 0
