@@ -26,7 +26,6 @@
 // Systems that need to be done.
 //
 // [X] Profiling
-// [] UI for both Utility and Gameplay
 // [] Commands to give Items
 // [] State management for being in the title screen, playing, pause menu.
 // [] Day night cycle, lighting color needs to be changed accordingly.
@@ -49,6 +48,7 @@ int main() {
   Texture2D TextileSheet = LoadTextureFromImage(ImgtileSheet);
   UnloadImage(ImgtileSheet);
   
+  SetTextureFilter(TextileSheet, TEXTURE_FILTER_POINT);
   u32 LightTextureDim = 256;
   u32 LightTextureSize = LightTextureDim * LightTextureDim * sizeof(jamColor);
 
@@ -112,6 +112,10 @@ int main() {
       } else {
       }
 
+      if (tileY > global_world.Height / 1.5) { 
+            CurrentTile.type = 43;
+      }
+
       if (CurrentTile.type == 0) {
         CurrentTile.light = packR4G4B4AF(15, 15, 15);
       }
@@ -138,7 +142,7 @@ int main() {
   b32 follow = true; 
   total_entities global_entities = {};
 
-  u8 entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
+  u8 player_entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
   u8 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE, true);
 
   b32 profilerToggle = false;
@@ -181,11 +185,10 @@ int main() {
       
     }
 
-
     if (follow) {
       update_entity_loop(&global_entities, global_world, deltaTime, OneSecond);
-      follow_camera.target = {global_entities.entities[entity_id].pos.x, 
-                            global_entities.entities[entity_id].pos.y};
+      follow_camera.target = {global_entities.entities[player_entity_id].pos.x, 
+                            global_entities.entities[player_entity_id].pos.y};
     } else {
       if (IsKeyDown(KEY_W)) {
         follow_camera.target.y -= 5;
@@ -201,9 +204,15 @@ int main() {
       }
     }
 
+    if (global_entities.entities[player_entity_id].fallDistance) {
+      global_ui_style.PlayerInformation.Health -= global_entities.entities[player_entity_id].fallDistance;
+      global_entities.entities[player_entity_id].fallDistance = 0;
+      global_ui_style.Dirty = true;
+    } 
+    
     v2 render_distance = {256, 256};
-    v2 minimum = {floor_f32((global_entities.entities[entity_id].pos.x / global_world.TileSize) - (render_distance.x / 2)), 
-                  floor_f32((global_entities.entities[entity_id].pos.y / global_world.TileSize) - (render_distance.y / 2))};
+    v2 minimum = {floor_f32((global_entities.entities[player_entity_id].pos.x / global_world.TileSize) - (render_distance.x / 2)), 
+                  floor_f32((global_entities.entities[player_entity_id].pos.y / global_world.TileSize) - (render_distance.y / 2))};
 
     minimum.x = Maximum(0, minimum.x);
     minimum.y = Maximum(0, minimum.y);
@@ -321,7 +330,7 @@ int main() {
     
 
       EndMode2D();
-      
+      DrawText(TextFormat("Fall Velocity %f", global_entities.entities[player_entity_id].velocity.y), 0, 0, 20, WHITE);
       DrawUI(&global_ui_style, UI_texture, profilerToggle, playerUIToggle);
     // TODO: Put this in the DebugUI.
     

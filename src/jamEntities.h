@@ -24,6 +24,7 @@ enum entity_states {
 };
 
 struct entity {
+  // TODO[ECS]: Components for sparseness.
   u32 state;
   v2 pos;
   v2 velocity;
@@ -31,6 +32,7 @@ struct entity {
   v2 dim;
   s32 stateTime; // Max amount of seconds that an entity can be in a state.
   b32 debug_render; // this is a boolean later on it will probably be collapsed into flags.
+  f32 fallDistance;
 };
 
 #define MAX_ENTITIES 256
@@ -124,6 +126,9 @@ static v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaT
   jam_rect2 tile_box = collision_rect_construction(ground_box, global_world);
   if (!AABBcollisioncheck(ground_box, tile_box)) {
     Entity->acceleration.y += global_world.gravity_constant;
+    // TODO[ECS]: I need the sparseness this shouldn't be a component on all entities.
+    // Unless all entities want to take fall damage.
+  } else {
   }
   Entity->acceleration += -drag_coefficent * Entity->velocity;
   Result = (.5 * Entity->acceleration * (deltaTime * deltaTime)) + (Entity->velocity * deltaTime);
@@ -187,6 +192,10 @@ static void collision_resolution_for_move(entity *Entity, world global_world, v2
     
     f32 normalLength = LengthSq(normal);
     if (normalLength > 0.0f) {
+      // TODO[ECS]: Fix this.
+      if (Entity->velocity.y >= 100.0f) {
+        Entity->fallDistance = Entity->velocity.y * 0.4f;
+      }
       Entity->velocity = Entity->velocity - 1*Inner(Entity->velocity, normal) * normal;
       Entity->acceleration = Entity->acceleration - Inner(Entity->acceleration, normal) * normal;
     } else {

@@ -7,13 +7,6 @@
 #include "jamMath.h"
 #include "stdio.h"
 
-//
-// [] Move this to entirely GPU.
-// [] CPU <--> GPU toggle.
-// [-] Optimize CPU Lighting using SIMD if possible. <--- Might be possible but with the current lay out it would be very hard to vectorize and use SIMD on.
-// [-] If optimization goes well get it up to 16 iterations.
-//
-
 typedef struct jamColor {
   u8 r;
   u8 g;
@@ -137,7 +130,7 @@ static void PropagateLighting(jamColor *prevValues, jamColor *nextValues, u32 Li
       } else {
         nextValues[middleIndex] = nextValues[middleIndex];
       }
-      
+
       for (s32 NeighborMapY = LightMapY - 1; NeighborMapY <= LightMapY + 1; NeighborMapY++) {
       for (s32 NeighborMapX = LightMapX - 1; NeighborMapX <= LightMapX + 1; NeighborMapX++) {
           if (NeighborMapX == LightMapX && NeighborMapY == LightMapY) { continue; } // We skip over this value in the loop because it's simpler to think that we already set the current value.
