@@ -5,7 +5,8 @@
 
 struct tile {
   s32 type;
-  // shader information
+
+  // R4G4B4A4
   u16 light;
 };
 

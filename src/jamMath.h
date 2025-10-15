@@ -48,175 +48,6 @@ u16 jamClamp_u16(u16 x, u16 low, u16 high) {
 // like periodic take the file mod time and re seed the random function in raylib.
 //SetRandomSeed(unsigned int seed);
 
-struct v2 {
-  union {
-    struct {
-      f32 x;
-      f32 y;
-    };
-    struct {
-      f32 width;
-      f32 height;
-    };
-    struct {
-      f32 u;
-      f32 v;
-    };
-    f32 E[2];
-  };
-};
-
-bool operator==(v2 A, v2 B) {
-  return A.x == B.x &&
-         A.y == B.y;
-}
-
-bool operator!=(v2 A, v2 B) {
-  return A.x != B.x &&
-         A.y != B.y;
-}
-
-v2 operator+(v2 A, v2 B) {
-  v2 Result = {};
-
-  Result.x = A.x + B.x;
-  Result.y = A.y + B.y;
-
-  return Result;
-}
-
-v2 operator-(v2 A, v2 B) {
-  v2 Result = {};
-
-  Result.x = A.x - B.x;
-  Result.y = A.y - B.y;
-
-  return Result;
-}
-
-v2 operator-(v2 A, f32 Scaler) {
-  v2 Result = {};
-
-  Result.x = A.x - Scaler;
-  Result.y = A.y - Scaler;
-
-  return Result;
-}
-
-v2 operator*(v2 A, v2 B) {
-  v2 Result = {};
-
-  Result.x = A.x * B.x;
-  Result.y = A.y * B.y;
-
-  return Result;
-}
-
-v2& operator*=(v2& A, f32 Scalar) {
-  A.x *= Scalar;
-  A.y *= Scalar;
-
-  return A;
-}
-
-v2& operator*=(v2& A, v2 B) {
-  A.x *= B.x;
-  A.y *= B.y;
-
-  return A;
-}
-
-v2& operator+=(v2& a, v2 b) {
-  a.x += b.x;
-  a.y += b.y;
-
-  return a;
-}
-
-v2& operator+=(v2& a, f32 b) {
-  a.x += b;
-  a.y += b;
-
-  return a;
-}
-
-v2 operator*(v2 A, f32 Scalar) {
-  v2 Result = {};
-
-  Result.x = A.x * Scalar;
-  Result.y = A.y * Scalar;
-
-  return Result;
-}
-
-v2 operator/(v2 A, f32 Scalar) {
-  v2 Result = {};
-
-  Result.x = A.x / Scalar;
-  Result.y = A.y / Scalar;
-
-  return Result;
-}
-
-v2 operator*(f32 Scalar, v2 A) {
-  v2 Result = {};
-
-  Result.x = A.x * Scalar;
-  Result.y = A.y * Scalar;
-
-  return Result;
-}
-
-struct v3 {
-  union {
-    struct {
-      f32 x;
-      f32 y;
-      f32 z;
-    };
-    struct {
-      f32 r;
-      f32 g;
-      f32 b;
-    };
-    f32 E[3];
-  };
-};
-
-struct v4 {
-  union {
-    struct {
-      f32 x;
-      f32 y;
-      f32 z;
-      f32 w;
-    };
-    struct {
-      f32 r;
-      f32 g;
-      f32 b;
-      f32 a;
-    };
-    f32 E[4];
-  };
-};
-
-struct jam_rect2 {
-  union {
-    struct {
-      v2 Min;
-      v2 Max;
-    };
-    struct {
-      f32 x;
-      f32 y;
-      f32 z;
-      f32 w;
-    };
-    f32 E[4];
-  };
-};
-
 static inline Vector2 JamToRayVec2(v2 A) {
   Vector2 Result = {};
 
@@ -265,6 +96,17 @@ static inline jam_rect2 JamRectMinDim(v2 Min, v2 Dim) {
   Result.y = Min.y;
   Result.Max.x = Min.x + Dim.x;
   Result.Max.y = Min.y + Dim.y;
+
+  return Result;
+}
+
+static inline jam_rect2 JamRectMinDim(Rectangle A) {
+  jam_rect2 Result = {};
+
+  Result.x = A.x;
+  Result.y = A.y;
+  Result.Max.x = A.x + A.width;
+  Result.Max.y = A.y + A.height;
 
   return Result;
 }

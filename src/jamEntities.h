@@ -4,14 +4,10 @@
 #include "jamTypes.h"
 #include "jamMath.h"
 #include "jamTiles.h"
+#include "jamCollision.h"
 #include "raylib.h"
 
 //
-// [] Entities should use a hash, for total loops use an index list.
-// [] ECS system to have sparse entity components.
-// [] Bosses
-// [] More behaviors + Smarter behaviors
-// [] Contribute to tile lighting. In some way that doesn't double store static light and dynamic light.
 //
 
 enum entity_states {
@@ -28,43 +24,19 @@ struct entity {
   u32 state;
   v2 pos;
   v2 velocity;
-  v2 acceleration; // this could be sparse? depends if I need the space.
+  v2 acceleration; 
   v2 dim;
-  s32 stateTime; // Max amount of seconds that an entity can be in a state.
-  b32 debug_render; // this is a boolean later on it will probably be collapsed into flags.
+  s32 stateTime;
+  b32 debug_render;
   f32 fallDistance;
 };
 
 #define MAX_ENTITIES 256
 struct total_entities {
   u8 entity_count;
-  // need someway to do an entity that chases another entity.
-  // that isn't O(n^2)
   entity entities[MAX_ENTITIES];
 };
 
-static inline b32 AABBcollisioncheck(jam_rect2 A, jam_rect2 B) {
-  b32 left = A.Max.x < B.x;
-  b32 right = A.x > B.Max.x;
-  b32 bottom = A.Max.y < B.y;
-  b32 top = A.y > B.Max.y;
-  
-  return !(left   ||
-           right  ||
-           bottom ||
-           top);
-}
-
-static jam_rect2 rectangle_overlap(jam_rect2 A, jam_rect2 B) {
-  jam_rect2 Result = {};
-  
-  Result.x = B.x - A.Max.x;
-  Result.Max.x = B.Max.x - A.x;
-  Result.y = B.y - A.Max.y;
-  Result.Max.y = B.Max.y - A.y;
-  
-  return Result;
-}
 
 static jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
     u32 MinTileX = (floor_f32(A.Min.x)) / global_world.TileSize;
@@ -75,14 +47,7 @@ static jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
     jam_rect2 TileRect = {};
     for (u32 TileY = MinTileY; TileY <= MaxTileY; TileY++) {
       for (u32 TileX = MinTileX; TileX <= MaxTileX; TileX++) {
-        // general accessor function incoming.
         tile CurrentTile = getTile(global_world, TileX, TileY);
-        // okay new theory I need to construct an actual rectangle from all the connecting tiles
-        // this assumes a perfect AABB tile collision rect which is 90% of cases but if I want entities to have tile aligned dimensions
-        // it would be best to do a field of rectangles to do AABB collision on. That way I can have even more odd collision behaviors
-        // 0. look at all tiles overlaping the player
-        // 1. Construct a single rectangle out of the tiles (this will make it so entities can not have tile aligned dimensions)
-        // 2. use constructed rectangle to resolve collision
         if (CurrentTile.type != 0) {
           jam_rect2 current_tile_rectangle = JamRectMinDim(v2{(f32)TileX * global_world.TileSize, (f32)TileY * global_world.TileSize}, global_world.TileSize);
 
@@ -118,18 +83,17 @@ static u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_sta
 }
 
 static v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {
+  TIMED_BLOCK();
   v2 Result = {};
-  // grounded block check.
+  
   f32 padding = 1;
   f32 drag_coefficent = 2.0f;
   jam_rect2 ground_box = JamRectMinDim(v2{Entity->pos.x + padding, Entity->pos.y + (Entity->dim.y - padding)}, v2{Entity->dim.x - (padding * 2), 1.2});
   jam_rect2 tile_box = collision_rect_construction(ground_box, global_world);
   if (!AABBcollisioncheck(ground_box, tile_box)) {
     Entity->acceleration.y += global_world.gravity_constant;
-    // TODO[ECS]: I need the sparseness this shouldn't be a component on all entities.
-    // Unless all entities want to take fall damage.
-  } else {
   }
+  
   Entity->acceleration += -drag_coefficent * Entity->velocity;
   Result = (.5 * Entity->acceleration * (deltaTime * deltaTime)) + (Entity->velocity * deltaTime);
 
@@ -254,7 +218,6 @@ static void entity_ignore(entity *Entity, f32 inputStrength) {
 //   1. Construct new Acceleration
 //   2. Generate a delta movement
 //   3. Either apply that delta movement directly to entity or apply it through collision_resolution_move.
-//   This means that to do pathing finding it will have to be a solve for acceleration for that frame.
 static void update_entity_loop(total_entities *global_entities, world global_world, f32 deltaTime, f32 OneSecond) {
   for (u8 entity_index = 0; entity_index < global_entities->entity_count; entity_index++) {
     entity currentEntity = global_entities->entities[entity_index];

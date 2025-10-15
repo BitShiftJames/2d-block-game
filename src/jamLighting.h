@@ -39,6 +39,7 @@ u8 u16Valuestou32Values[16] = {
   238,
   255,
 };
+
 // Alpha is default to max.
 static inline u16 packR4G4B4AF(u16 r, u16 g, u16 b) {
   u16 Result = (jamClamp_u16(r, 0, 15) << 12) | 

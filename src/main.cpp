@@ -1,3 +1,4 @@
+#include "jamInventory.h"
 #define PERMISSION 1
 #if PERMISSION
 // a profiler from Handmade hero (Day 176-179). 
@@ -18,19 +19,6 @@
 #include "jamUI.h"
 
 #include <string.h>
-
-//
-// TODO: Write an LSP and treesitter because the current ones 
-// for C and C++ have horrible configuration steps for neovim.
-//
-// Systems that need to be done.
-//
-// [X] Profiling
-// [] Commands to give Items
-// [] State management for being in the title screen, playing, pause menu.
-// [] Day night cycle, lighting color needs to be changed accordingly.
-// [] Better asset handling. 
-//
 
 int main() {
   u32 flags = FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT;// FLAG_WINDOW_TOPMOST | FLAG_WINDOW_UNDECORATED;
@@ -91,7 +79,51 @@ int main() {
   s32 LightMaploc = GetShaderLocation(testShader, "texture1");
   f32 LightFallOff = 0.9f;
   UI_ASSETS global_ui_style = {};
-  InitUI(&global_ui_style);
+
+  Inventory_information storageInventory = {};
+  storageInventory.DisplaySlots = 8;
+  storageInventory.Row = 8;
+  storageInventory.Size = 64;
+
+  Inventory_information playerInventory = {};
+  playerInventory.DisplaySlots = 8;
+  playerInventory.Row = 8;
+  playerInventory.Size = 64;
+
+  playerInventory.storage[0].HasItem = true;
+  playerInventory.storage[0].item_in_me.AtlasIndex = 0;
+  playerInventory.storage[0].item_in_me.Name = "Blue";
+  playerInventory.storage[0].item_in_me.SourceRect = JamRectMinDim(v2{0, 0}, v2{16, 16});
+  
+  // TODO: Scope this.
+  CURSOR_OBJECT global_cursor = {};
+  global_cursor.texture = LoadTexture("../assets/Cursor.png");
+
+  global_cursor.layer1 = {0, 0, (f32)global_cursor.texture.width, (f32)((u32)(global_cursor.texture.height / 3))};
+  global_cursor.layer2 = {0, CURSOR_SIDE, (f32)global_cursor.texture.width, (f32)((u32)(global_cursor.texture.height / 3))};
+  global_cursor.layer3 = {0, CURSOR_SIDE * 2, (f32)global_cursor.texture.width, (f32)((u32)(global_cursor.texture.height / 3))};
+
+  Cursor_inventory_information CursorInventory = {};
+  CursorInventory.dest_rect = JamRectMinDim(v2{0, 0}, v2{16, 16});
+
+  global_cursor.Inventory = CursorInventory;
+
+  // FIXME: Boss information is not set. Sort of intentional.
+  // FIXME: Terrible player naming badness change it to use an entity component of health.
+  player_information player_info = {};
+  player_info.Health = 400;
+  
+  global_ui_style.storageInventory = &storageInventory;
+  global_ui_style.playerInventory = &playerInventory;
+  global_ui_style.cursor = &global_cursor;
+
+  global_ui_style.PlayerInformation = &player_info;
+
+  global_ui_style.Dirty = true;
+
+  // this will have to get a lot smarter in the future.
+  global_ui_style.item_icons = LoadTexture("../assets/itemsheet.png");
+  SetTextureFilter(global_ui_style.item_icons, TEXTURE_FILTER_POINT);
 
   world global_world = {0};
   global_world.Width = 500;
@@ -175,11 +207,11 @@ int main() {
     }
 
     if (IsKeyPressed(KEY_TAB)) {
-      if (global_ui_style.Playerinventory.DisplaySlots != 8) {
-        global_ui_style.Playerinventory.DisplaySlots = 8;
+      if (playerInventory.DisplaySlots != 8) {
+        playerInventory.DisplaySlots = 8;
         global_ui_style.Dirty = true;       
       } else {
-        global_ui_style.Playerinventory.DisplaySlots = 40;
+        playerInventory.DisplaySlots = 40;
         global_ui_style.Dirty = true;       
       }
       
@@ -204,8 +236,47 @@ int main() {
       }
     }
 
+    Vector2 MousePos = GetMousePosition();
+    MousePos.x -= CURSOR_HALF_SIDE;
+    MousePos.y -= CURSOR_HALF_SIDE;
+
+    global_cursor.MousePosition = MousePos;
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+      for (u32 i = 0; i < global_ui_style.player_collision_count; i++) {
+        if (PointInRect(global_ui_style.playerInvCollision[i], MousePos)) {
+          // Should this also be an inventory function. The line / between UI rendering and logic is hard to make a direct boundary.
+          // Respect my boundaries bro.
+          // Also right now this is unneeded indirection added for seemingly no benefit. Some benefit in now that I can edit the memory of the inventory out side of UI interaction.
+          if (!global_cursor.Inventory.storage.HasItem) {
+            take_from_slot(&playerInventory.storage[i], &global_cursor.Inventory.storage);
+          } else {
+            take_from_slot(&global_cursor.Inventory.storage, &playerInventory.storage[i]);
+          }
+            
+          global_ui_style.Dirty = true;
+        }
+      }
+      // TODO: Collapse this
+      if (global_ui_style.storage_collision_count) {
+        for (u32 i = 0; i < global_ui_style.storage_collision_count; i++) {
+          if (PointInRect(global_ui_style.StorageInvCollision[i], MousePos)) {
+
+            if (!global_cursor.Inventory.storage.HasItem) {
+              take_from_slot(&storageInventory.storage[i], &global_cursor.Inventory.storage);
+            } else {
+              // YOU BETTER SAY BLESS YOU
+              take_from_slot(&global_cursor.Inventory.storage, &storageInventory.storage[i]);
+            }
+              
+            global_ui_style.Dirty = true;
+
+          }
+        }
+      }
+    }
+
     if (global_entities.entities[player_entity_id].fallDistance) {
-      global_ui_style.PlayerInformation.Health -= global_entities.entities[player_entity_id].fallDistance;
+      global_ui_style.PlayerInformation->Health -= global_entities.entities[player_entity_id].fallDistance;
       global_entities.entities[player_entity_id].fallDistance = 0;
       global_ui_style.Dirty = true;
     } 
