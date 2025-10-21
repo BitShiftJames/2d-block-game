@@ -7,8 +7,13 @@
 #include "jamCollision.h"
 #include "raylib.h"
 
+// 
+// 22:26
 //
-//
+
+#include "stdio.h"
+
+#define MAX_ENTITIES 256
 
 enum entity_states {
   INVALID,
@@ -19,24 +24,120 @@ enum entity_states {
   ATTACK,
 };
 
+enum ComponentFlags {
+  HEALTH_COMPONENT = (1 << 0),
+};
+
+struct healthComponent {
+  u32 EntityID;
+  s32 Health;
+  u32 EffectFlags;
+};
+
+u32 hash(u32 ID, u32 Table_size) {
+  // TODO: Test this hash function to make sure it works over a large amount of IDs.
+  u32 a = 1103515245;
+  u32 c = 12345;
+  u32 m = 1u << 31; 
+
+  u32 Result = (a * ID + c) % m;
+
+  Result = Result % Table_size;
+
+  return Result;
+}
+
+
 struct entity {
   // TODO[ECS]: Components for sparseness.
+  u32 EntityID;
+
   u32 state;
   v2 pos;
   v2 velocity;
   v2 acceleration; 
   v2 dim;
   s32 stateTime;
-  b32 debug_render;
+
+
   f32 fallDistance;
+
 };
 
-#define MAX_ENTITIES 256
+bool AddHealthComponent(healthComponent *HealthComponents, u32 ID, u32 Health) {
+  bool Result = false;
+
+  u32 hash_index = hash(ID, MAX_ENTITIES);
+  for (s32 i=0; i < MAX_ENTITIES; i++) {
+    s32 trying = (i + hash_index) % MAX_ENTITIES;
+    if (HealthComponents[trying].EntityID) {
+      // Skip to next.
+      continue;
+    } else {
+      HealthComponents[trying].EntityID = ID;
+      HealthComponents[trying].Health = Health;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool DeleteHealthComponent(healthComponent *HealthComponents, u32 ID) {
+  u32 hash_index = hash(ID, MAX_ENTITIES);
+  for (s32 i = 0; i < MAX_ENTITIES; i++) {
+    s32 trying = (i + hash_index) % MAX_ENTITIES;
+
+    if (ID == HealthComponents[trying].EntityID) {
+      HealthComponents[trying].EntityID = 0;
+      HealthComponents[trying].Health = 0;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool HealthLookUp(healthComponent *HealthComponents, healthComponent *storeComponent, u32 ID) {
+  u32 hash_index = hash(ID, MAX_ENTITIES);
+  for (s32 i = 0; i < MAX_ENTITIES; i++) {
+    s32 trying = (i + hash_index) % MAX_ENTITIES;
+
+    if (ID == HealthComponents[trying].EntityID) {
+      *storeComponent = HealthComponents[trying];
+      return true;
+    }
+
+  }
+
+  return false;
+}
+
+
 struct total_entities {
   u8 entity_count;
+
+  healthComponent HealthComponents[MAX_ENTITIES];
   entity entities[MAX_ENTITIES];
 };
 
+static u32 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State) {
+  u32 entity_id;
+
+  if (global_entities->entity_count < ArrayCount(global_entities->entities) - 1) {
+    global_entities->entities[global_entities->entity_count].dim = dim;
+    global_entities->entities[global_entities->entity_count].pos = pos;
+    global_entities->entities[global_entities->entity_count].state = State;
+    
+    
+    // Do better handling of this, currently this is a hack to stop an OOB access also the first entity will not be the character.
+    global_entities->entities[global_entities->entity_count].EntityID = entity_id = global_entities->entity_count++;
+    
+    printf("Entity ID: %u has a hash index of %u\n",entity_id, hash(entity_id, MAX_ENTITIES));
+  }
+
+  return entity_id;
+}
 
 static jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
     u32 MinTileX = (floor_f32(A.Min.x)) / global_world.TileSize;
@@ -66,20 +167,6 @@ static jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
     }
 
   return TileRect;
-}
-
-static u8 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State, b32 debug_state) {
-  u8 entity_id;
-  if (global_entities->entity_count < ArrayCount(global_entities->entities) - 1) {
-    global_entities->entities[global_entities->entity_count].dim = dim;
-    global_entities->entities[global_entities->entity_count].pos = pos;
-    global_entities->entities[global_entities->entity_count].state = State;
-    global_entities->entities[global_entities->entity_count].debug_render = debug_state;
-
-    entity_id = global_entities->entity_count++;
-  }
-
-  return entity_id;
 }
 
 static v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {

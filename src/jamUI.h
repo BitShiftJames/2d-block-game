@@ -6,6 +6,9 @@
 #include "jamInventory.h"
 #include "jamCollision.h"
 
+// TODO: See if decoupling some components from jamEntities is worth it.
+#include "jamEntities.h"
+
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
@@ -34,15 +37,6 @@ struct CURSOR_OBJECT {
   Cursor_inventory_information Inventory;
 };
 
-struct player_information {
-  u32 EffectBitField;
-  u32 Health;
-};
-
-struct boss_information {
-  u32 Health;
-};
-
 struct UI_ASSETS {
   CURSOR_OBJECT *cursor;
 
@@ -50,9 +44,12 @@ struct UI_ASSETS {
   Inventory_information *storageInventory;
 
   // TODO: DO something with this.
-  boss_information *bossInformation;
-
-  player_information *PlayerInformation;
+  healthComponent *bossInformation;
+  // TODO: This just being a health component is not speaking to what this 
+  // might actually be in future. Spoiler alert it would be easier to change
+  // because everything passed to the UI is a pointer and I can change the rendering 
+  // logic at any time.
+  healthComponent *PlayerInformation;
   
   // TODO: Smarter UI collision.
   u32 player_collision_count;

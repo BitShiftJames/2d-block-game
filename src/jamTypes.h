@@ -4,6 +4,8 @@
 // TODO: Get rid of C standard library? looked through the header and can't read how to actually set these myself.
 #include <stdint.h>
 
+#include <math.h>
+
 #define Minimum(a, b) ((a) < (b) ? (a) : (b))
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
 #define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
@@ -24,6 +26,7 @@ typedef int64_t s64;
 
 typedef float f32;
 typedef double f64;
+
 struct v2 {
   union {
     struct {
@@ -192,5 +195,38 @@ struct v4 {
     f32 E[4];
   };
 };
+
+static inline jam_rect2 JamRectMinDim(v2 Min, v2 Dim) {
+  jam_rect2 Result = {};
+
+  Result.x = Min.x;
+  Result.y = Min.y;
+  Result.Max.x = Min.x + Dim.x;
+  Result.Max.y = Min.y + Dim.y;
+
+  return Result;
+}
+
+static inline jam_rect2 JamRectMinDim(v2 Min, f32 Dim) {
+  jam_rect2 Result = {};
+
+  Result.x = Min.x;
+  Result.y = Min.y;
+  Result.Max.x = Min.x + Dim;
+  Result.Max.y = Min.y + Dim;
+
+  return Result;
+}
+
+static inline jam_rect2 JamRectMinMax(v2 Min, v2 Max) {
+  jam_rect2 Result = {};
+
+  Result.x = Min.x;
+  Result.y = Min.y;
+  Result.Max.x = Max.x;
+  Result.Max.y = Max.y;
+
+  return Result;
+}
 
 #endif

@@ -89,16 +89,6 @@ static inline Rectangle JamToRayRect(jam_rect2 A) {
   return Result;
 }
 
-static inline jam_rect2 JamRectMinDim(v2 Min, v2 Dim) {
-  jam_rect2 Result = {};
-
-  Result.x = Min.x;
-  Result.y = Min.y;
-  Result.Max.x = Min.x + Dim.x;
-  Result.Max.y = Min.y + Dim.y;
-
-  return Result;
-}
 
 static inline jam_rect2 JamRectMinDim(Rectangle A) {
   jam_rect2 Result = {};
@@ -107,28 +97,6 @@ static inline jam_rect2 JamRectMinDim(Rectangle A) {
   Result.y = A.y;
   Result.Max.x = A.x + A.width;
   Result.Max.y = A.y + A.height;
-
-  return Result;
-}
-
-static inline jam_rect2 JamRectMinDim(v2 Min, f32 Dim) {
-  jam_rect2 Result = {};
-
-  Result.x = Min.x;
-  Result.y = Min.y;
-  Result.Max.x = Min.x + Dim;
-  Result.Max.y = Min.y + Dim;
-
-  return Result;
-}
-
-static inline jam_rect2 JamRectMinMax(v2 Min, v2 Max) {
-  jam_rect2 Result = {};
-
-  Result.x = Min.x;
-  Result.y = Min.y;
-  Result.Max.x = Max.x;
-  Result.Max.y = Max.y;
 
   return Result;
 }

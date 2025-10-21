@@ -1,5 +1,5 @@
 #include "jamInventory.h"
-#define PERMISSION 1
+#define PERMISSION 0
 #if PERMISSION
 // a profiler from Handmade hero (Day 176-179). 
 // I got permission but I probably won't include it in the code still.
@@ -92,7 +92,7 @@ int main() {
 
   playerInventory.storage[0].HasItem = true;
   playerInventory.storage[0].item_in_me.AtlasIndex = 0;
-  playerInventory.storage[0].item_in_me.Name = "Blue";
+  playerInventory.storage[0].item_in_me.Name = (char *)"Blue";
   playerInventory.storage[0].item_in_me.SourceRect = JamRectMinDim(v2{0, 0}, v2{16, 16});
   
   // TODO: Scope this.
@@ -110,14 +110,11 @@ int main() {
 
   // FIXME: Boss information is not set. Sort of intentional.
   // FIXME: Terrible player naming badness change it to use an entity component of health.
-  player_information player_info = {};
-  player_info.Health = 400;
   
   global_ui_style.storageInventory = &storageInventory;
   global_ui_style.playerInventory = &playerInventory;
   global_ui_style.cursor = &global_cursor;
 
-  global_ui_style.PlayerInformation = &player_info;
 
   global_ui_style.Dirty = true;
 
@@ -161,7 +158,6 @@ int main() {
         spawn_location = {(f32)tileX * global_world.TileSize, (f32)tileY * global_world.TileSize};
       }
 
-
       global_world.map[tileY * global_world.Width + tileX] = CurrentTile;
     }
   }
@@ -174,8 +170,17 @@ int main() {
   b32 follow = true; 
   total_entities global_entities = {};
 
-  u8 player_entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE, true);
-  u8 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE, true);
+  u32 player_entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE);
+  AddHealthComponent(global_entities.HealthComponents, player_entity_id, 400);
+
+  // This is a lot of indirection to just set the health information but realistically 
+  // this is not an operation that is done often.
+  healthComponent player_health_component;
+  HealthLookUp(global_entities.HealthComponents, &player_health_component, player_entity_id);
+  global_ui_style.PlayerInformation = &player_health_component;
+
+  u32 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE);
+  AddHealthComponent(global_entities.HealthComponents, horse_id, 400);
 
   b32 profilerToggle = false;
   b32 playerUIToggle = true;
