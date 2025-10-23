@@ -24,14 +24,18 @@ enum entity_states {
   ATTACK,
 };
 
-enum ComponentFlags {
-  HEALTH_COMPONENT = (1 << 0),
-};
-
 struct healthComponent {
   u32 EntityID;
   s32 Health;
   u32 EffectFlags;
+};
+
+struct fallComponent {
+  u32 EntityID;
+
+  b32 groundedLastFrame;
+  f32 lastKnownGroundPosition;
+
 };
 
 u32 hash(u32 ID, u32 Table_size) {
@@ -59,10 +63,76 @@ struct entity {
   v2 dim;
   s32 stateTime;
 
-
-  f32 fallDistance;
-
 };
+
+bool AddFallComponent(fallComponent *fallComponents, u32 ID) {
+  bool Result = false;
+
+  u32 hash_index = hash(ID, MAX_ENTITIES);
+  for (s32 i=0; i < MAX_ENTITIES; i++) {
+    s32 trying = (i + hash_index) % MAX_ENTITIES;
+    if (fallComponents[trying].EntityID) {
+      // Skip to next.
+      continue;
+    } else {
+      fallComponents[trying].EntityID = ID;
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// TODO: is the delete needed for a fall component. Probably if I do NPC's effected by fall damage.
+bool DeleteFallComponent(fallComponent *fallComponents, u32 ID) {
+  u32 hash_index = hash(ID, MAX_ENTITIES);
+  for (s32 i = 0; i < MAX_ENTITIES; i++) {
+    s32 trying = (i + hash_index) % MAX_ENTITIES;
+
+    if (ID == fallComponents[trying].EntityID) {
+      fallComponents[trying].EntityID = 0;
+      fallComponents[trying].lastKnownGroundPosition = 0;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// TODO[ECS]: Should this be wrapped with a peek call or is this fine.
+fallComponent *fallLookUp(fallComponent *fallComponents, u32 ID) {
+
+  fallComponent *Result = {};
+
+  u32 hash_index = hash(ID, MAX_ENTITIES);
+  for (s32 i = 0; i < MAX_ENTITIES; i++) {
+    s32 trying = (i + hash_index) % MAX_ENTITIES;
+
+    if (ID == fallComponents[trying].EntityID) {
+      Result = &fallComponents[trying];
+      return Result;
+    }
+
+  }
+
+  return Result;
+}
+
+// TODO[ECS]: Bounded peak or something like that. Limit the amount of iterations
+bool fallPeak(fallComponent *fallComponents, u32 ID) {
+  u32 hash_index = hash(ID, MAX_ENTITIES);
+  for (s32 i = 0; i < MAX_ENTITIES; i++) {
+    s32 trying = (i + hash_index) % MAX_ENTITIES;
+
+    if (ID == fallComponents[trying].EntityID) {
+      return true;
+    }
+
+  }
+
+  return false;
+}
 
 bool AddHealthComponent(healthComponent *HealthComponents, u32 ID, u32 Health) {
   bool Result = false;
@@ -115,28 +185,34 @@ bool HealthLookUp(healthComponent *HealthComponents, healthComponent *storeCompo
 
 
 struct total_entities {
-  u8 entity_count;
+  u32 entity_count;
+  u32 entity_id = 1;
 
   healthComponent HealthComponents[MAX_ENTITIES];
+  // Using an entire list for fall components is kind of stupid.
+  // Counter point. Dynamic memory allocation for certain list are incoming.
+  fallComponent fallComponents[MAX_ENTITIES];
   entity entities[MAX_ENTITIES];
 };
 
 static u32 add_entity(total_entities *global_entities, v2 dim, v2 pos, entity_states State) {
-  u32 entity_id;
+  u32 entity_count;
 
   if (global_entities->entity_count < ArrayCount(global_entities->entities) - 1) {
     global_entities->entities[global_entities->entity_count].dim = dim;
     global_entities->entities[global_entities->entity_count].pos = pos;
     global_entities->entities[global_entities->entity_count].state = State;
     
+    // TODO[ECS]: Start hashing and storing position in a hashtable because currently the entity ID is very fragile.
+    // and also not up to spec with what the hash tables expect which is that a 0 entity_id is invalid.
+    entity_count = global_entities->entity_count;
+    global_entities->entities[global_entities->entity_count++].EntityID = global_entities->entity_id;
     
-    // Do better handling of this, currently this is a hack to stop an OOB access also the first entity will not be the character.
-    global_entities->entities[global_entities->entity_count].EntityID = entity_id = global_entities->entity_count++;
-    
-    printf("Entity ID: %u has a hash index of %u\n",entity_id, hash(entity_id, MAX_ENTITIES));
+    printf("Entity ID: %u has a hash index of %u\n", global_entities->entity_id, hash(global_entities->entity_id, MAX_ENTITIES));
+    global_entities->entity_id++;
   }
 
-  return entity_id;
+  return entity_count;
 }
 
 static jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
@@ -169,7 +245,9 @@ static jam_rect2 collision_rect_construction(jam_rect2 A, world global_world) {
   return TileRect;
 }
 
-static v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaTime) {
+// TODO[ECS]: Do something smarter here instead of having to pass global_entities in everywhere.
+static v2 generate_delta_movement(total_entities *global_entities, entity *Entity, world global_world, f32 deltaTime) {
+
   TIMED_BLOCK();
   v2 Result = {};
   
@@ -177,8 +255,29 @@ static v2 generate_delta_movement(entity *Entity, world global_world, f32 deltaT
   f32 drag_coefficent = 2.0f;
   jam_rect2 ground_box = JamRectMinDim(v2{Entity->pos.x + padding, Entity->pos.y + (Entity->dim.y - padding)}, v2{Entity->dim.x - (padding * 2), 1.2});
   jam_rect2 tile_box = collision_rect_construction(ground_box, global_world);
+
+  fallComponent *storeComponent = {};
+  if (fallPeak(global_entities->fallComponents, Entity->EntityID)) {
+    storeComponent = fallLookUp(global_entities->fallComponents, Entity->EntityID);
+  }
+
   if (!AABBcollisioncheck(ground_box, tile_box)) {
     Entity->acceleration.y += global_world.gravity_constant;
+
+      // Null ptr badness.
+      if (storeComponent) {
+        if (storeComponent->groundedLastFrame) {
+          storeComponent->groundedLastFrame = false;
+          storeComponent->lastKnownGroundPosition = Entity->pos.y;
+        }
+
+      }
+
+  } else {
+    // Null ptr badness.
+    if (storeComponent) {
+    storeComponent->groundedLastFrame = true;
+    }
   }
   
   Entity->acceleration += -drag_coefficent * Entity->velocity;
@@ -244,9 +343,6 @@ static void collision_resolution_for_move(entity *Entity, world global_world, v2
     f32 normalLength = LengthSq(normal);
     if (normalLength > 0.0f) {
       // TODO[ECS]: Fix this.
-      if (Entity->velocity.y >= 100.0f) {
-        Entity->fallDistance = Entity->velocity.y * 0.4f;
-      }
       Entity->velocity = Entity->velocity - 1*Inner(Entity->velocity, normal) * normal;
       Entity->acceleration = Entity->acceleration - Inner(Entity->acceleration, normal) * normal;
     } else {
@@ -333,7 +429,11 @@ static void update_entity_loop(total_entities *global_entities, world global_wor
           // this is an error.
         }
     }
-    v2 entity_movement_delta = generate_delta_movement(&global_entities->entities[entity_index], global_world,
+
+    // TODO[ECS]: When moving fully to an ECS based look it would be much easier to just be able to 
+    // pass in an ID and then get all the needed information from the global entity data.
+    //
+    v2 entity_movement_delta = generate_delta_movement(global_entities, &global_entities->entities[entity_index], global_world,
                                                        deltaTime);
 
     collision_resolution_for_move(&global_entities->entities[entity_index], global_world, 

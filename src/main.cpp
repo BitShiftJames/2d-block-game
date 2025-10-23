@@ -170,17 +170,21 @@ int main() {
   b32 follow = true; 
   total_entities global_entities = {};
 
-  u32 player_entity_id = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE);
-  AddHealthComponent(global_entities.HealthComponents, player_entity_id, 400);
-
+  u32 player_entity_count = add_entity(&global_entities, v2{24, 42}, spawn_location, IGNORE);
+  
+  // TODO[ECS]: There is a lot of badness around the entity count and entity id because they are kind of coupled a lot.
+  // At some point they should be fully decoupled.
+  
+  AddHealthComponent(global_entities.HealthComponents, global_entities.entities[player_entity_count].EntityID, 400);
+  AddFallComponent(global_entities.fallComponents, global_entities.entities[player_entity_count].EntityID);
   // This is a lot of indirection to just set the health information but realistically 
   // this is not an operation that is done often.
   healthComponent player_health_component;
-  HealthLookUp(global_entities.HealthComponents, &player_health_component, player_entity_id);
+  HealthLookUp(global_entities.HealthComponents, &player_health_component, global_entities.entities[player_entity_count].EntityID);
   global_ui_style.PlayerInformation = &player_health_component;
 
-  u32 horse_id = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE);
-  AddHealthComponent(global_entities.HealthComponents, horse_id, 400);
+  u32 horse_entity_count = add_entity(&global_entities, v2{60, 42}, spawn_location, IDLE);
+  AddHealthComponent(global_entities.HealthComponents, global_entities.entities[horse_entity_count].EntityID, 400);
 
   b32 profilerToggle = false;
   b32 playerUIToggle = true;
@@ -224,8 +228,8 @@ int main() {
 
     if (follow) {
       update_entity_loop(&global_entities, global_world, deltaTime, OneSecond);
-      follow_camera.target = {global_entities.entities[player_entity_id].pos.x, 
-                            global_entities.entities[player_entity_id].pos.y};
+      follow_camera.target = {global_entities.entities[player_entity_count].pos.x, 
+                            global_entities.entities[player_entity_count].pos.y};
     } else {
       if (IsKeyDown(KEY_W)) {
         follow_camera.target.y -= 5;
@@ -261,6 +265,7 @@ int main() {
           global_ui_style.Dirty = true;
         }
       }
+
       // TODO: Collapse this
       if (global_ui_style.storage_collision_count) {
         for (u32 i = 0; i < global_ui_style.storage_collision_count; i++) {
@@ -280,15 +285,9 @@ int main() {
       }
     }
 
-    if (global_entities.entities[player_entity_id].fallDistance) {
-      global_ui_style.PlayerInformation->Health -= global_entities.entities[player_entity_id].fallDistance;
-      global_entities.entities[player_entity_id].fallDistance = 0;
-      global_ui_style.Dirty = true;
-    } 
-    
     v2 render_distance = {256, 256};
-    v2 minimum = {floor_f32((global_entities.entities[player_entity_id].pos.x / global_world.TileSize) - (render_distance.x / 2)), 
-                  floor_f32((global_entities.entities[player_entity_id].pos.y / global_world.TileSize) - (render_distance.y / 2))};
+    v2 minimum = {floor_f32((global_entities.entities[player_entity_count].pos.x / global_world.TileSize) - (render_distance.x / 2)), 
+                  floor_f32((global_entities.entities[player_entity_count].pos.y / global_world.TileSize) - (render_distance.y / 2))};
 
     minimum.x = Maximum(0, minimum.x);
     minimum.y = Maximum(0, minimum.y);
@@ -406,7 +405,7 @@ int main() {
     
 
       EndMode2D();
-      DrawText(TextFormat("Fall Velocity %f", global_entities.entities[player_entity_id].velocity.y), 0, 0, 20, WHITE);
+      DrawText(TextFormat("Fall Velocity %f", global_entities.entities[player_entity_count].velocity.y), 0, 0, 20, WHITE);
       DrawUI(&global_ui_style, UI_texture, profilerToggle, playerUIToggle);
     // TODO: Put this in the DebugUI.
     
